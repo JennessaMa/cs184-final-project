@@ -1,0 +1,194 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Rasterizer</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2018</h1>
+<h1 align="middle">Project 1: Rasterizer</h1>
+<h2 align="middle">Jennessa Ma and Austin Patel, CS184</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>In this project we explored the rasterization process tarting from simple triangles with single colors and with colored vertices. We then expanded to include rendering textures. To improve the quality of the rendered output, we implemented sampling rate techniques, pixel interpolation, and mipmap interpolation methods. The final result is we are able to render many SVG images onto our screen. We learned a lot about how to work with C++ vectors as well as how to work with a screen buffer and frame buffer. We also got experience visually debugging our programs.</p>
+
+<h2 align="middle">Section I: Rasterization</h2>
+
+<h3 align="middle">Part 1: Rasterizing single-color triangles</h3>
+
+<p>We first compute a bounding box for the triangle by computing the max of all x and y coordinates and then the min of all x and y coordinates. We then iterate through every pixel in the bounding box and determine whether the candidate pixel is in the triangle using a function called <b>inside</b> that we defined that checks if a point is on the positive side of a line. We call the inside function 3 times both for the clockwise and counterclockwise winding orders to determine if the point is in the triangle.</p>
+  <p>We only check each pixel within the bounding box of the triangle once.</p>
+
+<div align="middle">
+  <img src="images/task1_test4.png" align="middle" width="400px"/>
+  <figcaption align="middle">basic test 4 image</figcaption>
+</div>
+
+
+<h3 align="middle">Part 2: Antialiasing triangles</h3>
+<p>In <b>rasterize_traingle</b>, we implemented supersampling rasterization by not calling <b>fill_pixel</b> because <b>fill_pixel</b> will fill every subpixel in (x,y).
+Instead, we converted the given vertices into the supersampled coordinate system and tested if each individual subpixel was <b>inside</b> the 3 lines. Then, we manually
+filled the <b>sample_buffer</b> if it passes the <b>inside</b> test.</inside></p>
+  <p>Our <b>inside</b> helper function takes in 2 vertices and an (x,y) coordinate to test whether that (x,y) is inside the line connected by the 2 vertices.</p>
+  <p>In <b>resolve_to_framebuffer</b>, instead of using the color of 1 pixel (x,y), we averaged the rgb values of the nxn subpixels within (x,y). As seen in the
+  screenshots, this averaging/supersampling technique was helpful in reducing jagged lines and made the overall images look much smoother. Instead of the stark
+  transition from a white pixel to a colored pixel, there were smoother transitions and opaque colors in the pixel.</p>
+  <p>We also made small modifications to <b>set_framebuffer_target</b> and <b>set_sample_rate</b> to extend the <b>sample_buffer</b>'s length to account for supersampling. </p>
+
+  <div align="middle">
+      <table style="width=100%">
+        <tr>
+          <td>
+            <img src="images/task2_test4_sample_rate_1.png" align="middle" width="400px"/>
+            <figcaption align="middle">Test 4 with sample_rate=1</figcaption>
+          </td>
+          <td>
+            <img src="images/task2_test4_sample_rate_4.png" align="middle" width="400px"/>
+            <figcaption align="middle">Test 4 with sample_rate=4</figcaption>
+          </td>
+          <td>
+            <img src="images/task2_test4_sample_rate_16.png" align="middle" width="400px"/>
+            <figcaption align="middle">Test 4 with sample_rate=16</figcaption>
+          </td>
+        </tr>
+      </table>
+  </div>
+
+<h3 align="middle">Part 3: Transforms</h3>
+<p>We were trying to make cubeman look like it's frolicking in the coordinate space so we rotated its left and right
+arms as well as its legs to give it look like it's dancing/jumping.</p>
+
+  <div align="middle">
+    <table style="width=100%">
+      <tr>
+        <td>
+          <img src="images/task3.png" align="middle" width="400px"/>
+          <figcaption align="middle">Our custom robot!</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+<h2 align="middle">Section II: Sampling</h2>
+
+<h3 align="middle">Part 4: Barycentric coordinates</h3>
+<p>We used the linear algebra view of computing the baycentric view coordinates. Given 3 vertices and a coordinate(i,j) we're interpolating from, we construct a matrix
+using the 3 vertices and multiply its inverse with the vector of [i, j, 1]. This gives us the values of alpha, beta, and gamma that we can use to weight the 3 colors c0, c1, and c2.</p>
+  <p>This can be seen in our example triangle with 3 corners of red, green, and blue where it becomes an evenly weighted gradient in the center.</p>
+
+
+  <div align="middle">
+    <table style="width=100%">
+      <tr>
+        <td>
+          <img src="images/task4_tri_colors.png" align="middle" width="400px"/>
+          <figcaption align="middle">Single triangle with R, G, and B colored vertices</figcaption>
+        </td>
+        <td>
+          <img src="images/task4_color_wheel.png" align="middle" width="400px"/>
+          <figcaption align="middle">Color wheel</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+<h3 align="middle">Part 5: "Pixel sampling" for texture mapping</h3>
+
+  <p>To render a textured triangle we use the same supersampling approach as for the triangle with the colored vertices. To determine the color for each supersampled pixel, we map from the sample buffer space to the texture space by applying the barycentric coordinates we determined from the sample space to the provided texture space coordinates. Once we know the texture coordinates, we perform nearest neighbor sampling by converting the coordinates to integers. For the bilinear sampling, we determine the four pixels that are nearest to the desired texture location and linearly weight each of them. We make sure to handle edge cases on the border of the image.</p>
+
+  <p>For a supersampling rate of 1, we notice that the bilinear filtering has a much smoother result around the text of the Berkeley logo than nearest neighbor sampling. For the supersampling rate of 16, we don't notice much of a difference between the two sampling methods. This makes sense as the supersampling will already smooth out the image for high sampling rates. There will be a larger difference between the sampling methods when the sampling rate is lower, as the image won't already have the smoothing effects of a larger supersampling rate.</p>
+
+  <div align="middle">
+    <table style="width=100%">
+      <tr>
+        <td>
+          <img src="images/task5_test5_nearest.png" align="middle" width="400px"/>
+          <figcaption align="middle">Nearest sampling at 1 sample per pixel </figcaption>
+        </td>
+        <td>
+          <img src="images/task5_test5_bilinear.png" align="middle" width="400px"/>
+          <figcaption align="middle">Bilinear sampling at 1 sample per pixel</figcaption>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <img src="images/task5_test6_nearest.png" align="middle" width="400px"/>
+          <figcaption align="middle">Nearest sampling at 16 sample per pixel </figcaption>
+        </td>
+        <td>
+          <img src="images/task5_test6_bilinear.png" align="middle" width="400px"/>
+          <figcaption align="middle">Bilinear sampling at 16 sample per pixel</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+<h3 align="middle">Part 6: "Level sampling" with mipmaps for texture mapping</h3>
+
+  <p>
+    Level sampling involves choosing or interpolating between different mipmap levels of a texture. We achieve this by computing how a change in sample buffer coordinates corresponds to a change in texture space coordinates. We do this by computing how much a change by 1 pixel in the x and y directions in sample buffer coordinates causes a change in texture coordinates (by computing the barycentric texture space coordinates for x+1 and y+1 points). Then we scale the derivates by the width and height of the texture to determine how many pixels we would move in the texture space. If we stride by a large number of pixels in the texture space, then it makes sense to use a higher mipmap level (one that is lower resolution).
+  </p>
+
+  <p>
+    Pixel sampling tradeoffs: The options are bilinear and nearest sampling methods. Nearest is faster than bilinear sampling because we only need to look at the color value of one pixel whereas we need to look at four color values for bilinear and do additional linear interpolations calculations. Memory requirements are very similar for both, but bilinear requires more compute.
+  </p>
+
+  <p>
+    Level sampling tradeoffs: The options are zero, nearest, and linear. The zero sampling method has the least computational cost as we always know the level is 0. Linear has the highest computational cost as we have to sample colors at two layers and linearly interpolate between them. Memory requirements for zero level sampling are the least as we don't have to store mipmap levels in memory besides the first level.
+  </p>
+
+  <p>
+    Sampling rate tradeoffs: The higher the sampling rate, the higher the memory usage as we have to store a larger sample buffer. Larger sampling rate also has higher compute cost as we need to average pixels across a larger region when going from the sample buffer to the screen buffer.
+  </p>
+
+
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="images/l_zero_p_nearest.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_ZERO + P_NEAREST</figcaption>
+      </td>
+      <td>
+        <img src="images/l_zero_p_linear.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_ZERO + P_LINEAR</figcaption>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="images/l_nearest_p_nearest.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_NEAREST + P_NEAREST</figcaption>
+      </td>
+      <td>
+        <img src="images/l_nearest_p_linear.png" align="middle" width="400px"/>
+        <figcaption align="middle">L_NEAREST + P_LINEAR</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<p><b>THIS IS OUR WEBSITE: <a href="https://cal-cs184-student.github.io/sp23-project-webpages-horseshoe/proj1/index.html">https://cal-cs184-student.github.io/sp23-project-webpages-horseshoe/proj1/index.html</a></b></p>
+
+</body>
+</html>
