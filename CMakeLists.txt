@@ -62,11 +62,6 @@ target_link_libraries(draw PUBLIC OpenGL::GLU)
 
 target_link_libraries(draw PRIVATE CGL)
 
-# Freetype
-find_package(Freetype REQUIRED)
-target_include_directories(draw PRIVATE ${FREETYPE_INCLUDE_DIRS})
-target_link_libraries(draw PRIVATE ${FREETYPE_LIBRARIES})
-
 
 #-------------------------------------------------------------------------------
 # Add subdirectories

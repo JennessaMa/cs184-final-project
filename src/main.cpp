@@ -15,9 +15,6 @@
 #include "transforms.h"
 #include "svgparser.h"
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
 using namespace std;
 using namespace CGL;
 
@@ -115,13 +112,6 @@ int main( int argc, char** argv ) {
   if (svgs.empty()) {
     msg("No svg files successfully loaded. Exiting.");
     return 0;
-  }
-
-  FT_Library ft;
-  if (FT_Init_FreeType (&ft) == 0) {
-    cout << "Successfully initialized freetype :)" << endl;
-  } else {
-    cout << "Failed to initialize freetype :(" << endl;
   }
 
     // create application
