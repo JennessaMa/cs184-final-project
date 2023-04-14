@@ -119,11 +119,24 @@ int main( int argc, char** argv ) {
   }
 
   FT_Library ft;
+  FT_Face face;
   if (FT_Init_FreeType (&ft) == 0) {
     cout << "Successfully initialized freetype :)" << endl;
+    auto error = FT_New_Face( ft,
+                         "15716_FrugalSansLight.ttf",
+                         0,
+                         &face );
+    if (error == FT_Err_Unknown_File_Format) {
+      cout << "failed to open ttf" << endl;
+    } else if (error) {
+      cout << "some other error while opening ttf" << endl;
+      cout << error << endl;
+    }
+    cout << face->family_name << endl;
   } else {
     cout << "Failed to initialize freetype :(" << endl;
   }
+
 
     // create application
   DrawRend app(svgs);
