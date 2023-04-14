@@ -123,43 +123,54 @@ int main( int argc, char** argv ) {
   if (FT_Init_FreeType (&ft) == 0) {
     cout << "Successfully initialized freetype :)" << endl;
     auto error = FT_New_Face( ft,
-                         "15716_FrugalSansLight.ttf",
+                         "../15716_FrugalSansLight.ttf",
                          0,
                          &face );
     if (error == FT_Err_Unknown_File_Format) {
       cout << "failed to open ttf" << endl;
     } else if (error) {
       cout << "some other error while opening ttf" << endl;
-      cout << error << endl;
+      cout << FT_Error_String(error) << endl;
     }
-    cout << face->family_name << endl;
+    FT_Set_Char_Size(face, 0, 16 * 64, 300, 300);
+    error = FT_Load_Glyph(face, FT_Get_Char_Index(face, 'a'), FT_LOAD_DEFAULT);
+    FT_Outline *outline = &face->glyph->outline;
+
+    cout << outline->n_points << endl;
+    for (int i = 0; i < outline->n_points; i += 1) {
+      cout << outline->points[i].x << endl;
+      cout << outline->points[i].y << endl;
+      // rasterize_point(outline->points[i].x, outline->points[i].y, Color(1, 1, 1));
+    }
+
+    // FT_Render_Glyph(face->glyph, ft_render_mode_normal);
   } else {
     cout << "Failed to initialize freetype :(" << endl;
   }
 
-
-    // create application
-  DrawRend app(svgs);
-
-  if (argc > 4 && strcmp(argv[2],"nogl") == 0) {
-    app.init();
-    app.set_gl(false);
-    app.resize(stoi(argv[3]), stoi(argv[4]));
-    app.write_framebuffer();
-    return 0;
-  }
-
-  // create viewer
-  Viewer viewer = Viewer();
-
-  // set renderer
-  viewer.set_renderer(&app);
-
-  // init viewer
-  viewer.init();
-
-  // start viewer
-  viewer.start();
+//
+//    // create application
+//  DrawRend app(svgs);
+//
+//  if (argc > 4 && strcmp(argv[2],"nogl") == 0) {
+//    app.init();
+//    app.set_gl(false);
+//    app.resize(stoi(argv[3]), stoi(argv[4]));
+//    app.write_framebuffer();
+//    return 0;
+//  }
+//
+//  // create viewer
+//  Viewer viewer = Viewer();
+//
+//  // set renderer
+//  viewer.set_renderer(&app);
+//
+//  // init viewer
+//  viewer.init();
+//
+//  // start viewer
+//  viewer.start();
 
   exit(EXIT_SUCCESS);
 

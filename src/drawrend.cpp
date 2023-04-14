@@ -306,6 +306,7 @@ void DrawRend::redraw() {
   SVG& svg = *svgs[current_svg];
   svg.draw(software_rasterizer, ndc_to_screen * svg_to_ndc[current_svg]);
 
+
   // draw canvas outline
   Vector2D a = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, 0)); a.x--; a.y++;
   Vector2D b = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(svg.width, 0)); b.x++; b.y++;
