@@ -16,8 +16,8 @@ namespace CGL {
 struct SVG;
 
 
-DrawRend::DrawRend(std::vector<SVG*> svgs_)
-: svgs(svgs_), current_svg(0)
+DrawRend::DrawRend(std::vector<SVG*> svgs_, FT_Face face)
+: svgs(svgs_), current_svg(0), font_face(face)
 {
 }
 
@@ -304,8 +304,7 @@ void DrawRend::redraw() {
   software_rasterizer->clear_buffers();
 
   SVG& svg = *svgs[current_svg];
-  svg.draw(software_rasterizer, ndc_to_screen * svg_to_ndc[current_svg]);
-
+  //  svg.draw(software_rasterizer, ndc_to_screen * svg_to_ndc[current_svg]);
 
   // draw canvas outline
   Vector2D a = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, 0)); a.x--; a.y++;
@@ -313,6 +312,30 @@ void DrawRend::redraw() {
   Vector2D c = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, svg.height)); c.x--; c.y--;
   Vector2D d = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(svg.width, svg.height)); d.x++; d.y--;
 
+  // Draw the font
+  FT_Set_Char_Size(font_face, 0, 16 * 64, 300, 300);
+  auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'a'), FT_LOAD_DEFAULT);
+  FT_Outline *outline = &font_face->glyph->outline;
+
+  cout << svg.width << " " << svg.height << endl; //  1 by 1???
+
+  cout << outline->n_points << endl;
+  for (int i = 0; i < outline->n_points; i += 1) {
+    // draw point at current control point
+    cout << outline->points[i].x << " " << outline->points[i].y <<  endl;
+    float p1x = a.x + (float) outline->points[i].x / 5;
+    float p1y = a.y + (float) outline->points[i].y / 5;
+    software_rasterizer->rasterize_point(p1x, p1y, Color(0, 0, 0));
+
+    // draw line between current point and next point
+    if (i < outline->n_points - 1) {
+      float p2x = a.x + (float) outline->points[i+1].x / 5;
+      float p2y = a.y + (float) outline->points[i+1].y / 5;
+      software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, Color(0,0,0));
+    }
+  }
+
+  // draw canvas outline
   software_rasterizer->rasterize_line(a.x, a.y, b.x, b.y, Color::Black);
   software_rasterizer->rasterize_line(a.x, a.y, c.x, c.y, Color::Black);
   software_rasterizer->rasterize_line(d.x, d.y, b.x, b.y, Color::Black);

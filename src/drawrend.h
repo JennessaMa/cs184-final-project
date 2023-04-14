@@ -11,11 +11,14 @@
 
 #include "rasterizer.h"
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 namespace CGL {
 
 class DrawRend : public Renderer {
  public:
-  DrawRend(std::vector<SVG*> svgs_); 
+  DrawRend(std::vector<SVG*> svgs_, FT_Face font_face);
 
   ~DrawRend( void );
 
@@ -53,6 +56,7 @@ class DrawRend : public Renderer {
 private:
   // Global state variables for SVGs, pixels, and view transforms
   std::vector<SVG*> svgs; size_t current_svg;
+  FT_Face font_face;
   std::vector<Matrix3x3> svg_to_ndc;
   float view_x, view_y, view_span;
 
