@@ -294,8 +294,7 @@ void DrawRend::write_framebuffer() {
     cerr << "Succesfully wrote framebuffer" << endl;
 }
 
-
-/**
+    /**
  * Draws the current SVG tab to the screen. Also draws a
  * border around the SVG canvas. Resolves the supersample buffers
  * into the framebuffer before posting the framebuffer pixels to the screen.
@@ -323,14 +322,14 @@ void DrawRend::redraw() {
   for (int i = 0; i < outline->n_points; i += 1) {
     // draw point at current control point
     cout << outline->points[i].x << " " << outline->points[i].y <<  endl;
-    float p1x = a.x + (float) outline->points[i].x / 5;
-    float p1y = a.y + (float) outline->points[i].y / 5;
+    float p1x = a.x + (float) outline->points[i].x / 5 + 300;
+    float p1y = a.y - (float) outline->points[i].y / 5 + 700;
     software_rasterizer->rasterize_point(p1x, p1y, Color(0, 0, 0));
 
     // draw line between current point and next point
     if (i < outline->n_points - 1) {
-      float p2x = a.x + (float) outline->points[i+1].x / 5;
-      float p2y = a.y + (float) outline->points[i+1].y / 5;
+      float p2x = a.x + (float) outline->points[i+1].x / 5 + 300;
+      float p2y = a.y - (float) outline->points[i+1].y / 5 + 700;
       software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, Color(0,0,0));
     }
   }
