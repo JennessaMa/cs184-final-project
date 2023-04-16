@@ -306,39 +306,54 @@ void DrawRend::redraw() {
   //  svg.draw(software_rasterizer, ndc_to_screen * svg_to_ndc[current_svg]);
 
   // draw canvas outline
-  Vector2D a = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, 0)); a.x--; a.y++;
-  Vector2D b = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(svg.width, 0)); b.x++; b.y++;
-  Vector2D c = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, svg.height)); c.x--; c.y--;
-  Vector2D d = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(svg.width, svg.height)); d.x++; d.y--;
+  Vector2D top_left = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, 0)); top_left.x--; top_left.y++;
+  Vector2D top_right = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(svg.width, 0)); top_right.x++; top_right.y++;
+  Vector2D bottom_left = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, svg.height)); bottom_left.x--; bottom_left.y--;
+  Vector2D bottom_right = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(svg.width, svg.height)); bottom_right.x++; bottom_right.y--;
 
   // Draw the font
-  FT_Set_Char_Size(font_face, 0, 16 * 64, 300, 300);
+  FT_Set_Char_Size(font_face, 0, 16 * 16, 300, 300);
   auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'a'), FT_LOAD_DEFAULT);
   FT_Outline *outline = &font_face->glyph->outline;
 
-  cout << svg.width << " " << svg.height << endl; //  1 by 1???
+  // cout << svg.width << " " << svg.height << endl; //  1 by 1???
 
-  cout << outline->n_points << endl;
+  // cout << outline->n_points << endl;
+  float min_x = (float) outline->points[0].x;
+  float max_x = (float) outline->points[0].x;
+  float min_y = (float) outline->points[0].y;
+  float max_y = (float) outline->points[0].y;
+  for (int i = 1; i < outline->n_points; i += 1) {
+      min_x = std::min(min_x, (float) outline->points[i].x);
+      max_x = std::max(max_x, (float) outline->points[i].x);
+      min_y = std::min(min_y, (float) outline->points[i].y);
+      max_y = std::max(max_y, (float) outline->points[i].y);
+  }
+  cout << "max" << max_y << ", min" << min_y;
+  float x_offset = ((top_right.x - top_left.x) - (max_x - min_x)) / 2.0;
+  float y_offset = ((bottom_right.y - top_right.y) - (max_y - min_y)) / 2.0;
   for (int i = 0; i < outline->n_points; i += 1) {
     // draw point at current control point
-    cout << outline->points[i].x << " " << outline->points[i].y <<  endl;
-    float p1x = a.x + (float) outline->points[i].x / 5 + 300;
-    float p1y = a.y - (float) outline->points[i].y / 5 + 700;
+    // cout << outline->points[i].x << " " << outline->points[i].y <<  endl;
+    float p1x = top_left.x + x_offset + (float) outline->points[i].x;
+    // Change float below (in "(512.0 - (float) outline->points[i].y)") to match dimensions
+    float p1y = top_left.y + y_offset + (512.0 - (float) outline->points[i].y);
     software_rasterizer->rasterize_point(p1x, p1y, Color(0, 0, 0));
 
     // draw line between current point and next point
     if (i < outline->n_points - 1) {
-      float p2x = a.x + (float) outline->points[i+1].x / 5 + 300;
-      float p2y = a.y - (float) outline->points[i+1].y / 5 + 700;
+      float p2x = top_left.x + x_offset + (float) outline->points[i+1].x;
+      // Change float below to match dimensions
+      float p2y = top_left.y + y_offset + (512.0 - (float) outline->points[i+1].y);
       software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, Color(0,0,0));
     }
   }
 
   // draw canvas outline
-  software_rasterizer->rasterize_line(a.x, a.y, b.x, b.y, Color::Black);
-  software_rasterizer->rasterize_line(a.x, a.y, c.x, c.y, Color::Black);
-  software_rasterizer->rasterize_line(d.x, d.y, b.x, b.y, Color::Black);
-  software_rasterizer->rasterize_line(d.x, d.y, c.x, c.y, Color::Black);
+  software_rasterizer->rasterize_line(top_left.x, top_left.y, top_right.x, top_right.y, Color::Black);
+  software_rasterizer->rasterize_line(top_left.x, top_left.y, bottom_left.x, bottom_left.y, Color::Black);
+  software_rasterizer->rasterize_line(bottom_right.x, bottom_right.y, top_right.x, top_right.y, Color::Black);
+  software_rasterizer->rasterize_line(bottom_right.x, bottom_right.y, bottom_left.x, bottom_left.y, Color::Black);
 
   software_rasterizer->resolve_to_framebuffer();
   if (gl)
