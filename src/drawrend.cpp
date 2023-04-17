@@ -357,11 +357,11 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color, std::
   }
 }
 
-FT_Outline DrawRend::interpolate_font(FT_Outline *outline1, FT_Outline *outline2, float t) {
-  
+FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outline2, float t) {
+  return *outline1;
 }
 
-void DrawRend::drawLetter(FT_Outline *outline, char letter, float font_x, float font_y, float font_scale) {
+void DrawRend::drawLetter(FT_Outline *outline, float font_x, float font_y, float font_scale) {
   SVG& svg = *svgs[current_svg];
   //  svg.draw(software_rasterizer, ndc_to_screen * svg_to_ndc[current_svg]);
 
@@ -543,7 +543,7 @@ void DrawRend::drawLetter(FT_Face font_face, char letter, float font_x, float fo
   auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, letter), FT_LOAD_DEFAULT);
   FT_Outline *outline = &font_face->glyph->outline;
 
-  drawLetter(outline, letter, font_x, font_y, font_scale);
+  drawLetter(outline, font_x, font_y, font_scale);
 }
 
     /**
@@ -559,9 +559,19 @@ void DrawRend::redraw() {
     drawLetter(font_faces[0], 'A', 0, 0, 0.5);
   } else if (font_faces.size() == 2){
     // draw two fonts and interpolate
-    drawLetter(font_faces[0], 'A', 0, 0, 0.33);
-    drawLetter(font_faces[0], 'I', 0.33, 0, 0.33);
-    drawLetter(font_faces[1], 'B', 0.66, 0, 0.33);
+    char letter = 'A';
+    FT_Set_Char_Size(font_faces[0], 0, 16 * 16, 300, 300);
+    FT_Load_Glyph(font_faces[0], FT_Get_Char_Index(font_faces[0], letter), FT_LOAD_DEFAULT);
+    FT_Outline *outline1 = &font_faces[0]->glyph->outline;
+
+    FT_Set_Char_Size(font_faces[1], 0, 16 * 16, 300, 300);
+    FT_Load_Glyph(font_faces[1], FT_Get_Char_Index(font_faces[1], letter), FT_LOAD_DEFAULT);
+    FT_Outline *outline2 = &font_faces[1]->glyph->outline;
+
+    drawLetter(font_faces[0], letter, 0, 0, 0.33);
+    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5);
+    drawLetter(&interpolated_outline, 0.33, 0, 0.33);
+    drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
   }
 
   // draw canvas outline
