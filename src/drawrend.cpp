@@ -312,7 +312,7 @@ Vector2D lerp2D(Vector2D p1, Vector2D p2, float t) {
   return (1 - t) * p1 + (t * p2);
 }
 
-void DrawRend::drawCurve(std::vector<Vector2D> controlPoints)
+void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color)
 {
   float lastX;
   float lastY;
@@ -331,7 +331,7 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints)
     // draw control point
     if (t != 0.0) {
       // draw line from (lastX, lastY) to (curX, curY)
-      software_rasterizer->rasterize_line(lastX, lastY, curX, curY, Color(0,0,0));
+      software_rasterizer->rasterize_line(lastX, lastY, curX, curY, color);
     }
 
     lastX = curControlPoints[0].x;
@@ -339,11 +339,6 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints)
   }
 }
 
-Vector2D offsetPoint(FT_Vector* point, Vector2D top_left, float x_offset, float y_offset) {
-  float p1x = top_left.x + x_offset + (float) point->x;
-  float p1y = top_left.y + y_offset + (512.0 - (float) point->y);
-  return Vector2D(p1x, p1y);
-}
     /**
  * Draws the current SVG tab to the screen. Also draws a
  * border around the SVG canvas. Resolves the supersample buffers
@@ -366,6 +361,14 @@ void DrawRend::redraw() {
   auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'B'), FT_LOAD_DEFAULT);
   FT_Outline *outline = &font_face->glyph->outline;
 
+  vector<Color> contourColors;
+  contourColors.push_back(Color(1, 0, 0)); //red
+  contourColors.push_back(Color(0, 1, 0)); //green
+  contourColors.push_back(Color(0, 0, 1)); //blue
+  contourColors.push_back(Color(1, 1, 0)); //yellow
+  contourColors.push_back(Color(1, 1, 1)); //black
+  contourColors.push_back(Color(1, 0, 1)); //pink
+
   // cout << outline->n_points << endl;
   float min_x = (float) outline->points[0].x;
   float max_x = (float) outline->points[0].x;
@@ -378,8 +381,18 @@ void DrawRend::redraw() {
       max_y = std::max(max_y, (float) outline->points[i].y);
   }
 
-  float x_offset = ((top_right.x - top_left.x) - (max_x - min_x)) / 2.0;
-  float y_offset = ((bottom_right.y - top_right.y) - (max_y - min_y)) / 2.0;
+  float canvas_width = top_right.x - top_left.x;
+  float canvas_height = bottom_right.y - top_right.y;
+
+  vector<Vector2D> shiftedPoints;
+  for (int i = 0; i < outline->n_points; i += 1) {
+    int x_width = max_x - min_x;
+    int y_height = max_y - min_y;
+    int shared_size = max(x_width, y_height);
+    double shiftX = (outline->points[i].x - min_x) / shared_size;
+    double shiftY = (outline->points[i].y - min_y) / shared_size;
+    shiftedPoints.push_back(Vector2D(top_left.x + shiftX * canvas_width , top_left.y + shiftY * canvas_height));
+  }
 
   for (int j = 0; j < outline->n_contours; j++) {
     int start_contour_index;
@@ -391,53 +404,53 @@ void DrawRend::redraw() {
     }
     int end_contour_index = outline->contours[j];
 
-    cout << "contour: " << start_contour_index << " to " << end_contour_index << endl;
+    cout << "contour #" << j << ": " << start_contour_index << " to " << end_contour_index << endl;
     int contour_length = end_contour_index - start_contour_index;
 
-    std::vector<Vector2D> offsetPoints; // length of this is contour_length
+    std::vector<Vector2D> curPoints; // length of this is contour_length
     std::vector<char> tags; // length of this is contour_length
     for (int i = start_contour_index; i <= end_contour_index; i += 1) {
-      offsetPoints.push_back(offsetPoint(&outline->points[i], top_left, x_offset, y_offset));
+      curPoints.push_back(shiftedPoints[i]);
       tags.push_back(outline->tags[i]);
     }
-    offsetPoints.push_back(offsetPoint(&outline->points[start_contour_index], top_left, x_offset, y_offset));
+    curPoints.push_back(shiftedPoints[start_contour_index]);
     tags.push_back(outline->tags[start_contour_index]);
 
-    for (int i = 0; i < offsetPoints.size(); i += 1) {
+    for (int i = 0; i < curPoints.size(); i += 1) {
       // draw point at current control point
       // cout << outline->points[i].x << " " << outline->points[i].y <<  endl;
-      Vector2D pt1 = offsetPoints[i];
+      Vector2D pt1 = curPoints[i];
       float p1x = pt1.x;
       float p1y = pt1.y;
       software_rasterizer->rasterize_point(p1x, p1y, Color(0, 0, 0));
 
       // draw line between current point and next point
-      if (i < offsetPoints.size() - 1) { // 1 1
-        Vector2D pt2 = offsetPoints[i + 1];
+      if (i < curPoints.size() - 1) { // 1 1
+        Vector2D pt2 = curPoints[i + 1];
         float p2x = pt2.x;
         float p2y = pt2.y;
 
         if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
             FT_ON_BIT(tags[i + 1]) == FT_CURVE_TAG_ON) {
-          software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, Color(0,0,0));
+          software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, contourColors[j]);
         }
       }
 
-      if (i < offsetPoints.size() - 2) { // 1 0 (conic) 1
+      if (i < curPoints.size() - 2) { // 1 0 (conic) 1
         if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
             (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
             FT_ON_BIT(tags[i + 2]) == FT_CURVE_TAG_ON) {
           // conic section
           cout << "detected conic section with 3 control points" << endl;
           std::vector<Vector2D> controlPoints;
-          controlPoints.push_back(offsetPoints[i]);
-          controlPoints.push_back(offsetPoints[i + 1]);
-          controlPoints.push_back(offsetPoints[i + 2]);
-          drawCurve(controlPoints);
+          controlPoints.push_back(curPoints[i]);
+          controlPoints.push_back(curPoints[i + 1]);
+          controlPoints.push_back(curPoints[i + 2]);
+          drawCurve(controlPoints, contourColors[j]);
         }
       }
 
-      if (i < offsetPoints.size() - 3) { // 1 0 (cubic) 0 (cubic) 1
+      if (i < curPoints.size() - 3) { // 1 0 (cubic) 0 (cubic) 1
         if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
             (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 1) and
             (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 1) and
@@ -445,34 +458,52 @@ void DrawRend::redraw() {
           // conic section
           cout << "detected cubic section with 4 control points" << endl;
           std::vector<Vector2D> controlPoints;
-          controlPoints.push_back(offsetPoints[i]);
-          controlPoints.push_back(offsetPoints[i + 1]);
-          controlPoints.push_back(offsetPoints[i + 2]);
-          controlPoints.push_back(offsetPoints[i + 3]);
-          drawCurve(controlPoints);
+          controlPoints.push_back(curPoints[i]);
+          controlPoints.push_back(curPoints[i + 1]);
+          controlPoints.push_back(curPoints[i + 2]);
+          controlPoints.push_back(curPoints[i + 3]);
+          drawCurve(controlPoints, contourColors[j]);
         }
       }
 
-      if (i < offsetPoints.size() - 3) { // 1 0 (conic) 0 (conic) 1
+      if (i < curPoints.size() - 4) { // 1 0 (conic) 0 (conic) 0 (conic) 1
+        if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
+            (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
+            (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 0) and
+            (FT_ON_BIT(tags[i + 3]) == 0 and FT_ORDER_BIT(tags[i + 3]) == 0) and
+            FT_ON_BIT(tags[i + 4]) == FT_CURVE_TAG_ON) {
+          // conic section
+          cout << "detected cubic section with 4 control points" << endl;
+          std::vector<Vector2D> controlPoints;
+          controlPoints.push_back(curPoints[i]);
+          controlPoints.push_back(curPoints[i + 1]);
+          controlPoints.push_back(curPoints[i + 2]);
+          controlPoints.push_back(curPoints[i + 3]);
+          controlPoints.push_back(curPoints[i + 4]);
+          drawCurve(controlPoints, contourColors[j]);
+        }
+      }
+
+      if (i < curPoints.size() - 3) { // 1 0 (conic) 0 (conic) 1
         if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
             (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
             (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 0) and
             FT_ON_BIT(tags[i + 3]) == FT_CURVE_TAG_ON) {
           // conic section
           cout << "detected conic off with 4 control points" << endl;
-          Vector2D virtualPoint = (offsetPoints[i + 1] + offsetPoints[i + 2]) / 2;
+          Vector2D virtualPoint = (curPoints[i + 1] + curPoints[i + 2]) / 2;
 
           std::vector<Vector2D> controlPoints;
-          controlPoints.push_back(offsetPoints[i]);
-          controlPoints.push_back(offsetPoints[i + 1]);
+          controlPoints.push_back(curPoints[i]);
+          controlPoints.push_back(curPoints[i + 1]);
           controlPoints.push_back(virtualPoint);
-          drawCurve(controlPoints);
+          drawCurve(controlPoints, contourColors[j]);
 
           controlPoints.clear();
           controlPoints.push_back(virtualPoint);
-          controlPoints.push_back(offsetPoints[i + 2]);
-          controlPoints.push_back(offsetPoints[i + 3]);
-          drawCurve(controlPoints);
+          controlPoints.push_back(curPoints[i + 2]);
+          controlPoints.push_back(curPoints[i + 3]);
+          drawCurve(controlPoints, contourColors[j]);
         }
       }
 
@@ -482,14 +513,14 @@ void DrawRend::redraw() {
 
 
 
-  
+
 
 
   // draw canvas outline
-  software_rasterizer->rasterize_line(top_left.x, top_left.y, top_right.x, top_right.y, Color::Black);
-  software_rasterizer->rasterize_line(top_left.x, top_left.y, bottom_left.x, bottom_left.y, Color::Black);
-  software_rasterizer->rasterize_line(bottom_right.x, bottom_right.y, top_right.x, top_right.y, Color::Black);
-  software_rasterizer->rasterize_line(bottom_right.x, bottom_right.y, bottom_left.x, bottom_left.y, Color::Black);
+//  software_rasterizer->rasterize_line(top_left.x, top_left.y, top_right.x, top_right.y, Color::Black);
+//  software_rasterizer->rasterize_line(top_left.x, top_left.y, bottom_left.x, bottom_left.y, Color::Black);
+//  software_rasterizer->rasterize_line(bottom_right.x, bottom_right.y, top_right.x, top_right.y, Color::Black);
+//  software_rasterizer->rasterize_line(bottom_right.x, bottom_right.y, bottom_left.x, bottom_left.y, Color::Black);
 
   software_rasterizer->resolve_to_framebuffer();
   if (gl)

@@ -51,7 +51,7 @@ class DrawRend : public Renderer {
   void set_view(float x, float y, float span);
   void move_view(float dx, float dy, float scale);
 
-  void drawCurve(std::vector<Vector2D> controlPoints);
+  void drawCurve(std::vector<Vector2D> controlPoints, Color color);
 
   Rasterizer * software_rasterizer;
 
@@ -80,7 +80,6 @@ private:
 };
 
 Vector2D lerp2D(Vector2D p1, Vector2D p2, float t);
-Vector2D offsetPoint(FT_Vector* point, Vector2D top_left, float x_offset, float y_offset);
 
 } // namespace CGL
 
