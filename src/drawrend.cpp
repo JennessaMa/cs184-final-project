@@ -363,7 +363,7 @@ void DrawRend::redraw() {
 
   // Draw the font
   FT_Set_Char_Size(font_face, 0, 16 * 16, 300, 300);
-  auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'a'), FT_LOAD_DEFAULT);
+  auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'B'), FT_LOAD_DEFAULT);
   FT_Outline *outline = &font_face->glyph->outline;
 
   // cout << outline->n_points << endl;
@@ -381,112 +381,106 @@ void DrawRend::redraw() {
   float x_offset = ((top_right.x - top_left.x) - (max_x - min_x)) / 2.0;
   float y_offset = ((bottom_right.y - top_right.y) - (max_y - min_y)) / 2.0;
 
-  for (int i = 0; i < outline->n_contours; i++) {
+  for (int j = 0; j < outline->n_contours; j++) {
     int start_contour_index;
-    if (i == 0) {
+    if (j == 0) {
       start_contour_index = 0;
     }
     else {
-      start_contour_index = outline->contours[i-1] + 1;
+      start_contour_index = outline->contours[j-1] + 1;
     }
+    int end_contour_index = outline->contours[j];
 
-    cout << "contour: " << start_contour_index << " to " << outline->contours[i] << endl;
+    cout << "contour: " << start_contour_index << " to " << end_contour_index << endl;
+    int contour_length = end_contour_index - start_contour_index;
 
+    std::vector<Vector2D> offsetPoints; // length of this is contour_length
+    std::vector<char> tags; // length of this is contour_length
+    for (int i = start_contour_index; i <= end_contour_index; i += 1) {
+      offsetPoints.push_back(offsetPoint(&outline->points[i], top_left, x_offset, y_offset));
+      tags.push_back(outline->tags[i]);
+    }
+    offsetPoints.push_back(offsetPoint(&outline->points[start_contour_index], top_left, x_offset, y_offset));
+    tags.push_back(outline->tags[start_contour_index]);
 
+    for (int i = 0; i < offsetPoints.size(); i += 1) {
+      // draw point at current control point
+      // cout << outline->points[i].x << " " << outline->points[i].y <<  endl;
+      Vector2D pt1 = offsetPoints[i];
+      float p1x = pt1.x;
+      float p1y = pt1.y;
+      software_rasterizer->rasterize_point(p1x, p1y, Color(0, 0, 0));
 
+      // draw line between current point and next point
+      if (i < offsetPoints.size() - 1) { // 1 1
+        Vector2D pt2 = offsetPoints[i + 1];
+        float p2x = pt2.x;
+        float p2y = pt2.y;
+
+        if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
+            FT_ON_BIT(tags[i + 1]) == FT_CURVE_TAG_ON) {
+          software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, Color(0,0,0));
+        }
+      }
+
+      if (i < offsetPoints.size() - 2) { // 1 0 (conic) 1
+        if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
+            (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
+            FT_ON_BIT(tags[i + 2]) == FT_CURVE_TAG_ON) {
+          // conic section
+          cout << "detected conic section with 3 control points" << endl;
+          std::vector<Vector2D> controlPoints;
+          controlPoints.push_back(offsetPoints[i]);
+          controlPoints.push_back(offsetPoints[i + 1]);
+          controlPoints.push_back(offsetPoints[i + 2]);
+          drawCurve(controlPoints);
+        }
+      }
+
+      if (i < offsetPoints.size() - 3) { // 1 0 (cubic) 0 (cubic) 1
+        if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
+            (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 1) and
+            (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 1) and
+            FT_ON_BIT(tags[i + 3]) == FT_CURVE_TAG_ON) {
+          // conic section
+          cout << "detected cubic section with 4 control points" << endl;
+          std::vector<Vector2D> controlPoints;
+          controlPoints.push_back(offsetPoints[i]);
+          controlPoints.push_back(offsetPoints[i + 1]);
+          controlPoints.push_back(offsetPoints[i + 2]);
+          controlPoints.push_back(offsetPoints[i + 3]);
+          drawCurve(controlPoints);
+        }
+      }
+
+      if (i < offsetPoints.size() - 3) { // 1 0 (conic) 0 (conic) 1
+        if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
+            (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
+            (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 0) and
+            FT_ON_BIT(tags[i + 3]) == FT_CURVE_TAG_ON) {
+          // conic section
+          cout << "detected conic off with 4 control points" << endl;
+          Vector2D virtualPoint = (offsetPoints[i + 1] + offsetPoints[i + 2]) / 2;
+
+          std::vector<Vector2D> controlPoints;
+          controlPoints.push_back(offsetPoints[i]);
+          controlPoints.push_back(offsetPoints[i + 1]);
+          controlPoints.push_back(virtualPoint);
+          drawCurve(controlPoints);
+
+          controlPoints.clear();
+          controlPoints.push_back(virtualPoint);
+          controlPoints.push_back(offsetPoints[i + 2]);
+          controlPoints.push_back(offsetPoints[i + 3]);
+          drawCurve(controlPoints);
+        }
+      }
+
+      cout << "i: " << i + start_contour_index << " cur tag: " << FT_ON_BIT(tags[i]) << " conic or cubic: " << FT_ORDER_BIT(tags[i]) << endl;
+    }
   }
 
-  std::vector<Vector2D> offsetPoints;
-  std::vector<char> tags;
-  for (int i = 0; i < outline->n_points; i += 1) {
-    offsetPoints.push_back(offsetPoint(&outline->points[i], top_left, x_offset, y_offset));
-    tags.push_back(outline->tags[i]);
-  }
-  offsetPoints.push_back(offsetPoint(&outline->points[0], top_left, x_offset, y_offset));
-  tags.push_back(outline->tags[0]);
 
-
-
-  for (int i = 0; i < offsetPoints.size(); i += 1) {
-    // for current i, what is the start point and end point defined by the contour
-    for (int i = 0; i < outline->n_contours; i++) {
-
-    }
-
-    // draw point at current control point
-    // cout << outline->points[i].x << " " << outline->points[i].y <<  endl;
-    Vector2D pt1 = offsetPoints[i];
-    float p1x = pt1.x;
-    float p1y = pt1.y;
-    software_rasterizer->rasterize_point(p1x, p1y, Color(0, 0, 0));
-
-    // draw line between current point and next point
-    if (i < offsetPoints.size() - 1) { // 1 1
-      Vector2D pt2 = offsetPoints[i + 1];
-      float p2x = pt2.x;
-      float p2y = pt2.y;
-
-      if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
-      FT_ON_BIT(tags[i + 1]) == FT_CURVE_TAG_ON) {
-        software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, Color(0,0,0));
-      }
-    }
-
-    if (i < offsetPoints.size() - 2) { // 1 0 (conic) 1
-      if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
-          (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
-          FT_ON_BIT(tags[i + 2]) == FT_CURVE_TAG_ON) {
-        // conic section
-        cout << "detected conic section with 3 control points" << endl;
-        std::vector<Vector2D> controlPoints;
-        controlPoints.push_back(offsetPoints[i]);
-        controlPoints.push_back(offsetPoints[i + 1]);
-        controlPoints.push_back(offsetPoints[i + 2]);
-        drawCurve(controlPoints);
-      }
-    }
-
-    if (i < offsetPoints.size() - 3) { // 1 0 (cubic) 0 (cubic) 1
-      if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
-          (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 1) and
-          (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 1) and
-          FT_ON_BIT(tags[i + 3]) == FT_CURVE_TAG_ON) {
-        // conic section
-        cout << "detected cubic section with 4 control points" << endl;
-        std::vector<Vector2D> controlPoints;
-        controlPoints.push_back(offsetPoints[i]);
-        controlPoints.push_back(offsetPoints[i + 1]);
-        controlPoints.push_back(offsetPoints[i + 2]);
-        controlPoints.push_back(offsetPoints[i + 3]);
-        drawCurve(controlPoints);
-      }
-    }
-
-    if (i < offsetPoints.size() - 3) { // 1 0 (conic) 0 (conic) 1
-      if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
-          (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
-          (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 0) and
-          FT_ON_BIT(tags[i + 3]) == FT_CURVE_TAG_ON) {
-        // conic section
-        cout << "detected conic off with 4 control points" << endl;
-        Vector2D virtualPoint = (offsetPoints[i + 1] + offsetPoints[i + 2]) / 2;
-
-        std::vector<Vector2D> controlPoints;
-        controlPoints.push_back(offsetPoints[i]);
-        controlPoints.push_back(offsetPoints[i + 1]);
-        controlPoints.push_back(virtualPoint);
-        drawCurve(controlPoints);
-
-        controlPoints.clear();
-        controlPoints.push_back(virtualPoint);
-        controlPoints.push_back(offsetPoints[i + 2]);
-        controlPoints.push_back(offsetPoints[i + 3]);
-        drawCurve(controlPoints);
-      }
-    }
-
-    cout << "i: " << i << " cur tag: " << FT_ON_BIT(tags[i]) << " conic or cubic: " << FT_ORDER_BIT(tags[i]) << endl;
-  }
 
   
 
