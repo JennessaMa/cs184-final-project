@@ -123,7 +123,7 @@ int main( int argc, char** argv ) {
   if (FT_Init_FreeType (&ft) == 0) {
     cout << "Successfully initialized freetype :)" << endl;
     auto error = FT_New_Face( ft,
-                         "../15716_FrugalSansLight.ttf",
+                         "../times-new-roman.ttf",
                          0,
                          &face );
     if (error == FT_Err_Unknown_File_Format) {

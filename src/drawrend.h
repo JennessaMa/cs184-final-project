@@ -51,7 +51,7 @@ class DrawRend : public Renderer {
   void set_view(float x, float y, float span);
   void move_view(float dx, float dy, float scale);
 
-  void drawCurve(std::vector<Vector2D> controlPoints, Color color);
+  void drawCurve(std::vector<Vector2D> controlPoints, Color color, std::vector<Vector2D> *startingPoints, std::vector<Vector2D> *endingPoints);
 
   Rasterizer * software_rasterizer;
 

@@ -312,7 +312,23 @@ Vector2D lerp2D(Vector2D p1, Vector2D p2, float t) {
   return (1 - t) * p1 + (t * p2);
 }
 
-void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color)
+bool pointInPolygon(int polyCorners, vector<Vector2D> startingPoints, vector<Vector2D> endingPoints, float x, float y) {
+  bool inside = false;
+
+  for (int i=0; i < polyCorners; i++) {
+    Vector2D start = startingPoints[i];
+    Vector2D end = endingPoints[i];
+    if ((start.y < y && end.y >= y) || (end.y < y && start.y >= y)) {
+      if (start.x + (y - start.y) / (end.y - start.y) * (end.x - start.x) > x) {
+        inside = !inside;
+      }
+    }
+  }
+
+  return inside;
+}
+
+void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color, std::vector<Vector2D> *startingPoints, std::vector<Vector2D> *endingPoints)
 {
   float lastX;
   float lastY;
@@ -332,6 +348,8 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color)
     if (t != 0.0) {
       // draw line from (lastX, lastY) to (curX, curY)
       software_rasterizer->rasterize_line(lastX, lastY, curX, curY, color);
+      startingPoints->push_back(Vector2D(lastX, lastY));
+      endingPoints->push_back(Vector2D(curX, curY));
     }
 
     lastX = curControlPoints[0].x;
@@ -358,7 +376,7 @@ void DrawRend::redraw() {
 
   // Draw the font
   FT_Set_Char_Size(font_face, 0, 16 * 16, 300, 300);
-  auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'B'), FT_LOAD_DEFAULT);
+  auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'W'), FT_LOAD_DEFAULT);
   FT_Outline *outline = &font_face->glyph->outline;
 
   vector<Color> contourColors;
@@ -391,8 +409,10 @@ void DrawRend::redraw() {
     int shared_size = max(x_width, y_height);
     double shiftX = (outline->points[i].x - min_x) / shared_size;
     double shiftY = (outline->points[i].y - min_y) / shared_size;
-    shiftedPoints.push_back(Vector2D(top_left.x + shiftX * canvas_width , top_left.y + shiftY * canvas_height));
+    shiftedPoints.push_back(Vector2D(top_left.x + shiftX * canvas_width , top_left.y + (canvas_height - shiftY * canvas_height)));
   }
+  vector<Vector2D> startingPoints;
+  vector<Vector2D> endingPoints;
 
   for (int j = 0; j < outline->n_contours; j++) {
     int start_contour_index;
@@ -433,6 +453,8 @@ void DrawRend::redraw() {
         if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
             FT_ON_BIT(tags[i + 1]) == FT_CURVE_TAG_ON) {
           software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, contourColors[j]);
+          startingPoints.push_back(Vector2D(p1x, p1y));
+          endingPoints.push_back(Vector2D(p2x, p2y));
         }
       }
 
@@ -446,7 +468,7 @@ void DrawRend::redraw() {
           controlPoints.push_back(curPoints[i]);
           controlPoints.push_back(curPoints[i + 1]);
           controlPoints.push_back(curPoints[i + 2]);
-          drawCurve(controlPoints, contourColors[j]);
+          drawCurve(controlPoints, contourColors[j], &startingPoints, &endingPoints);
         }
       }
 
@@ -462,7 +484,7 @@ void DrawRend::redraw() {
           controlPoints.push_back(curPoints[i + 1]);
           controlPoints.push_back(curPoints[i + 2]);
           controlPoints.push_back(curPoints[i + 3]);
-          drawCurve(controlPoints, contourColors[j]);
+          drawCurve(controlPoints, contourColors[j], &startingPoints, &endingPoints);
         }
       }
 
@@ -480,7 +502,7 @@ void DrawRend::redraw() {
           controlPoints.push_back(curPoints[i + 2]);
           controlPoints.push_back(curPoints[i + 3]);
           controlPoints.push_back(curPoints[i + 4]);
-          drawCurve(controlPoints, contourColors[j]);
+          drawCurve(controlPoints, contourColors[j], &startingPoints, &endingPoints);
         }
       }
 
@@ -497,13 +519,13 @@ void DrawRend::redraw() {
           controlPoints.push_back(curPoints[i]);
           controlPoints.push_back(curPoints[i + 1]);
           controlPoints.push_back(virtualPoint);
-          drawCurve(controlPoints, contourColors[j]);
+          drawCurve(controlPoints, contourColors[j], &startingPoints, &endingPoints);
 
           controlPoints.clear();
           controlPoints.push_back(virtualPoint);
           controlPoints.push_back(curPoints[i + 2]);
           controlPoints.push_back(curPoints[i + 3]);
-          drawCurve(controlPoints, contourColors[j]);
+          drawCurve(controlPoints, contourColors[j], &startingPoints, &endingPoints);
         }
       }
 
@@ -511,10 +533,14 @@ void DrawRend::redraw() {
     }
   }
 
-
-
-
-
+  // fill in glyph
+  for (int x = (int) top_left.x; x < (int) top_right.x; x++) {
+    for (int y = (int) top_left.y; y < (int) bottom_left.y; y++) {
+      if (pointInPolygon(startingPoints.size(), startingPoints, endingPoints, (float) x, (float) y)) {
+        software_rasterizer->rasterize_point((float) x, (float) y, Color::Black);
+      }
+    }
+  }
 
   // draw canvas outline
 //  software_rasterizer->rasterize_line(top_left.x, top_left.y, top_right.x, top_right.y, Color::Black);
