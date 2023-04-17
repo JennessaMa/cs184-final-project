@@ -19,8 +19,8 @@ namespace CGL {
 struct SVG;
 
 
-DrawRend::DrawRend(std::vector<SVG*> svgs_, FT_Face face)
-: svgs(svgs_), current_svg(0), font_face(face)
+DrawRend::DrawRend(std::vector<SVG*> svgs_, std::vector<FT_Face> font_faces_)
+: svgs(svgs_), current_svg(0), font_faces(font_faces_)
 {
 }
 
@@ -357,14 +357,11 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color, std::
   }
 }
 
-    /**
- * Draws the current SVG tab to the screen. Also draws a
- * border around the SVG canvas. Resolves the supersample buffers
- * into the framebuffer before posting the framebuffer pixels to the screen.
- */
-void DrawRend::redraw() {
-  software_rasterizer->clear_buffers();
+FT_Outline DrawRend::interpolate_font(FT_Outline *outline1, FT_Outline *outline2, float t) {
+  
+}
 
+void DrawRend::drawLetter(FT_Outline *outline, char letter, float font_x, float font_y, float font_scale) {
   SVG& svg = *svgs[current_svg];
   //  svg.draw(software_rasterizer, ndc_to_screen * svg_to_ndc[current_svg]);
 
@@ -374,10 +371,6 @@ void DrawRend::redraw() {
   Vector2D bottom_left = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(0, svg.height)); bottom_left.x--; bottom_left.y--;
   Vector2D bottom_right = ndc_to_screen * svg_to_ndc[current_svg] * (Vector2D(svg.width, svg.height)); bottom_right.x++; bottom_right.y--;
 
-  // Draw the font
-  FT_Set_Char_Size(font_face, 0, 16 * 16, 300, 300);
-  auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, 'W'), FT_LOAD_DEFAULT);
-  FT_Outline *outline = &font_face->glyph->outline;
 
   vector<Color> contourColors;
   contourColors.push_back(Color(1, 0, 0)); //red
@@ -393,10 +386,10 @@ void DrawRend::redraw() {
   float min_y = (float) outline->points[0].y;
   float max_y = (float) outline->points[0].y;
   for (int i = 1; i < outline->n_points; i += 1) {
-      min_x = std::min(min_x, (float) outline->points[i].x);
-      max_x = std::max(max_x, (float) outline->points[i].x);
-      min_y = std::min(min_y, (float) outline->points[i].y);
-      max_y = std::max(max_y, (float) outline->points[i].y);
+    min_x = std::min(min_x, (float) outline->points[i].x);
+    max_x = std::max(max_x, (float) outline->points[i].x);
+    min_y = std::min(min_y, (float) outline->points[i].y);
+    max_y = std::max(max_y, (float) outline->points[i].y);
   }
 
   float canvas_width = top_right.x - top_left.x;
@@ -409,7 +402,8 @@ void DrawRend::redraw() {
     int shared_size = max(x_width, y_height);
     double shiftX = (outline->points[i].x - min_x) / shared_size;
     double shiftY = (outline->points[i].y - min_y) / shared_size;
-    shiftedPoints.push_back(Vector2D(top_left.x + shiftX * canvas_width , top_left.y + (canvas_height - shiftY * canvas_height)));
+    shiftedPoints.push_back(Vector2D(font_x * canvas_width + top_left.x + shiftX * canvas_width * font_scale,
+                                     font_y * canvas_height + top_left.y + (canvas_height - shiftY * canvas_height) * font_scale));
   }
   vector<Vector2D> startingPoints;
   vector<Vector2D> endingPoints;
@@ -424,7 +418,7 @@ void DrawRend::redraw() {
     }
     int end_contour_index = outline->contours[j];
 
-    cout << "contour #" << j << ": " << start_contour_index << " to " << end_contour_index << endl;
+    // cout << "contour #" << j << ": " << start_contour_index << " to " << end_contour_index << endl;
     int contour_length = end_contour_index - start_contour_index;
 
     std::vector<Vector2D> curPoints; // length of this is contour_length
@@ -463,7 +457,7 @@ void DrawRend::redraw() {
             (FT_ON_BIT(tags[i + 1]) == 0 and FT_ORDER_BIT(tags[i + 1]) == 0) and
             FT_ON_BIT(tags[i + 2]) == FT_CURVE_TAG_ON) {
           // conic section
-          cout << "detected conic section with 3 control points" << endl;
+          // cout << "detected conic section with 3 control points" << endl;
           std::vector<Vector2D> controlPoints;
           controlPoints.push_back(curPoints[i]);
           controlPoints.push_back(curPoints[i + 1]);
@@ -478,7 +472,7 @@ void DrawRend::redraw() {
             (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 1) and
             FT_ON_BIT(tags[i + 3]) == FT_CURVE_TAG_ON) {
           // conic section
-          cout << "detected cubic section with 4 control points" << endl;
+          // cout << "detected cubic section with 4 control points" << endl;
           std::vector<Vector2D> controlPoints;
           controlPoints.push_back(curPoints[i]);
           controlPoints.push_back(curPoints[i + 1]);
@@ -495,7 +489,7 @@ void DrawRend::redraw() {
             (FT_ON_BIT(tags[i + 3]) == 0 and FT_ORDER_BIT(tags[i + 3]) == 0) and
             FT_ON_BIT(tags[i + 4]) == FT_CURVE_TAG_ON) {
           // conic section
-          cout << "detected cubic section with 4 control points" << endl;
+          // cout << "detected cubic section with 4 control points" << endl;
           std::vector<Vector2D> controlPoints;
           controlPoints.push_back(curPoints[i]);
           controlPoints.push_back(curPoints[i + 1]);
@@ -512,7 +506,7 @@ void DrawRend::redraw() {
             (FT_ON_BIT(tags[i + 2]) == 0 and FT_ORDER_BIT(tags[i + 2]) == 0) and
             FT_ON_BIT(tags[i + 3]) == FT_CURVE_TAG_ON) {
           // conic section
-          cout << "detected conic off with 4 control points" << endl;
+          // cout << "detected conic off with 4 control points" << endl;
           Vector2D virtualPoint = (curPoints[i + 1] + curPoints[i + 2]) / 2;
 
           std::vector<Vector2D> controlPoints;
@@ -529,7 +523,7 @@ void DrawRend::redraw() {
         }
       }
 
-      cout << "i: " << i + start_contour_index << " cur tag: " << FT_ON_BIT(tags[i]) << " conic or cubic: " << FT_ORDER_BIT(tags[i]) << endl;
+      // cout << "i: " << i + start_contour_index << " cur tag: " << FT_ON_BIT(tags[i]) << " conic or cubic: " << FT_ORDER_BIT(tags[i]) << endl;
     }
   }
 
@@ -540,6 +534,34 @@ void DrawRend::redraw() {
         software_rasterizer->rasterize_point((float) x, (float) y, Color::Black);
       }
     }
+  }
+}
+
+void DrawRend::drawLetter(FT_Face font_face, char letter, float font_x, float font_y, float font_scale) {
+  // Draw the font
+  FT_Set_Char_Size(font_face, 0, 16 * 16, 300, 300);
+  auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, letter), FT_LOAD_DEFAULT);
+  FT_Outline *outline = &font_face->glyph->outline;
+
+  drawLetter(outline, letter, font_x, font_y, font_scale);
+}
+
+    /**
+ * Draws the current SVG tab to the screen. Also draws a
+ * border around the SVG canvas. Resolves the supersample buffers
+ * into the framebuffer before posting the framebuffer pixels to the screen.
+ */
+void DrawRend::redraw() {
+  software_rasterizer->clear_buffers();
+
+  if (font_faces.size() == 1) {
+    // draw just a single font
+    drawLetter(font_faces[0], 'A', 0, 0, 0.5);
+  } else if (font_faces.size() == 2){
+    // draw two fonts and interpolate
+    drawLetter(font_faces[0], 'A', 0, 0, 0.33);
+    drawLetter(font_faces[0], 'I', 0.33, 0, 0.33);
+    drawLetter(font_faces[1], 'B', 0.66, 0, 0.33);
   }
 
   // draw canvas outline

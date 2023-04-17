@@ -18,7 +18,7 @@ namespace CGL {
 
 class DrawRend : public Renderer {
  public:
-  DrawRend(std::vector<SVG*> svgs_, FT_Face font_face);
+  DrawRend(std::vector<SVG*> svgs_, std::vector<FT_Face> font_faces);
 
   ~DrawRend( void );
 
@@ -51,6 +51,10 @@ class DrawRend : public Renderer {
   void set_view(float x, float y, float span);
   void move_view(float dx, float dy, float scale);
 
+  void drawLetter(FT_Outline *outline, char letter, float font_x, float font_y, float font_scale);
+  void drawLetter(FT_Face font_face, char letter, float font_x, float font_y, float font_scale);
+  FT_Outline DrawRend::interpolate_font(FT_Outline *outline1, FT_Outline *outline2, float t);
+
   void drawCurve(std::vector<Vector2D> controlPoints, Color color, std::vector<Vector2D> *startingPoints, std::vector<Vector2D> *endingPoints);
 
   Rasterizer * software_rasterizer;
@@ -58,7 +62,7 @@ class DrawRend : public Renderer {
 private:
   // Global state variables for SVGs, pixels, and view transforms
   std::vector<SVG*> svgs; size_t current_svg;
-  FT_Face font_face;
+  std::vector<FT_Face> font_faces;
   std::vector<Matrix3x3> svg_to_ndc;
   float view_x, view_y, view_span;
 

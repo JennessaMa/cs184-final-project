@@ -105,6 +105,28 @@ vector<SVG*> loadPath( const char* path ) {
 }
 
 
+FT_Face load_font(const char* font_name ) {
+  FT_Library ft;
+  FT_Face face;
+  if (FT_Init_FreeType (&ft) == 0) {
+    cout << "Successfully initialized freetype :)" << endl;
+    auto error = FT_New_Face( ft,
+                              font_name,
+                              0,
+                              &face);
+    if (error == FT_Err_Unknown_File_Format) {
+      cout << "failed to open ttf" << endl;
+    } else if (error) {
+      cout << "some other error while opening ttf" << endl;
+      cout << FT_Error_String(error) << endl;
+    }
+  } else {
+    cout << "Failed to initialize freetype :(" << endl;
+  }
+  return face;
+}
+
+
 int main( int argc, char** argv ) {
 
   if (argc < 2) {
@@ -118,27 +140,12 @@ int main( int argc, char** argv ) {
     return 0;
   }
 
-  FT_Library ft;
-  FT_Face face;
-  if (FT_Init_FreeType (&ft) == 0) {
-    cout << "Successfully initialized freetype :)" << endl;
-    auto error = FT_New_Face( ft,
-                         "../times-new-roman.ttf",
-                         0,
-                         &face );
-    if (error == FT_Err_Unknown_File_Format) {
-      cout << "failed to open ttf" << endl;
-    } else if (error) {
-      cout << "some other error while opening ttf" << endl;
-      cout << FT_Error_String(error) << endl;
-    }
-  } else {
-    cout << "Failed to initialize freetype :(" << endl;
-  }
-
+  std::vector<FT_Face> font_faces;
+  font_faces.push_back(load_font("../times-new-roman.ttf"));
+  font_faces.push_back(load_font("../15716_FrugalSansLight.ttf"));
 
     // create application
-  DrawRend app(svgs, face);
+  DrawRend app(svgs, font_faces);
 
   if (argc > 4 && strcmp(argv[2],"nogl") == 0) {
     app.init();
