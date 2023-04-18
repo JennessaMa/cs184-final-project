@@ -51,10 +51,9 @@ class DrawRend : public Renderer {
   void set_view(float x, float y, float span);
   void move_view(float dx, float dy, float scale);
 
-  void drawLetter(FT_Outline *outline, float font_x, float font_y, float font_scale);
-  void drawLetter(FT_Face font_face, char letter, float font_x, float font_y, float font_scale);
-  FT_Outline interpolate_letter(FT_Outline *outline1, FT_Outline *outline2, float t);
-
+  vector<vector<Vector2D>> drawLetter(FT_Outline *outline, float font_x, float font_y, float font_scale);
+  vector<vector<Vector2D>> drawLetter(FT_Face font_face, char letter, float font_x, float font_y, float font_scale);
+  FT_Outline interpolate_letter(FT_Outline *outline1, FT_Outline *outline2, float t, vector<vector<Vector2D>> pointsInContour1, vector<vector<Vector2D>> pointsInContour2);
   void drawCurve(std::vector<Vector2D> controlPoints, Color color, std::vector<Vector2D> *startingPoints, std::vector<Vector2D> *endingPoints);
 
   Rasterizer * software_rasterizer;

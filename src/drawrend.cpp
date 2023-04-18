@@ -357,11 +357,72 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color, std::
   }
 }
 
-FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outline2, float t) {
+FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outline2, float t, vector<vector<Vector2D>> pointsInContour1, vector<vector<Vector2D>> pointsInContour2) {
+  FT_Outline res;
+  int m = 100;
+  res.n_contours = outline1->n_contours;
+  res.n_points = m;
+
+  vector<float> lengthsPerContour1; // list of euclidean lengths per contour
+  vector<float> lengthsPerContour2; // list of euclidean lengths per contour
+  vector<float> spacingPerContour1; // list of spacing per contour
+  vector<float> spacingPerContour2; // list of spacing per contour
+
+  // compute total length of each contour
+  for (auto pointsInAContour : pointsInContour1) {
+    float length;
+    for (int i = 0; i < pointsInAContour.size() - 1; i++) {
+      Vector2D startPoint = pointsInAContour[i];
+      Vector2D endPoint = pointsInAContour[i + 1];
+      length += (endPoint - startPoint).norm();
+    }
+
+    lengthsPerContour1.push_back(length);
+    spacingPerContour1.push_back(length / m);
+  }
+  for (auto pointsInAContour : pointsInContour2) {
+    float length;
+    for (int i = 0; i < pointsInAContour.size() - 1; i++) {
+      Vector2D startPoint = pointsInAContour[i];
+      Vector2D endPoint = pointsInAContour[i + 1];
+      length += (endPoint - startPoint).norm();
+    }
+
+    lengthsPerContour2.push_back(length);
+    spacingPerContour2.push_back(length / m);
+  }
+
+  vector<vector<Vector2D>> sampledPointsPerContour1; // list of m points sampled per contour
+  vector<vector<Vector2D>> sampledPointsPerContour2; // list of m points sampled per contour
+
+  for (int i = 0; i < outline1->n_contours; i += 1) {
+    // sample m points on the first font
+    float dist1 = spacingPerContour1[i];
+    vector<Vector2D> contour1Points = pointsInContour1[i];
+    vector<Vector2D> mSampledPointsForCurContour;
+    int currStartInd = 0;
+    float amountAlongCurLine = 0;
+    for (int j = 0; j < m; j++) {
+      float distToNextSample = dist1;
+
+      // look at line segment that goes from currStartInd to currStartInd + 1
+      float lengthOfCurSegment = (contour1Points[currStartInd] - contour1Points[currStartInd + 1]).norm();
+
+      // while distToNextSample > 0: still within distance between sample points
+        // if distToNextSample + amountAlongCurLine < lengthOfCurSegment: still on the same line after this sample point
+          // add sample point to mSampledPointsForCurContour: x = , y = (lerp to find sample point)
+
+        // if distToNextSample + amountAlongCurLine > lengthOfCurSegment
+    }
+    sampledPointsPerContour1.push_back(mSampledPointsForCurContour);
+
+    // sample m points on the second font
+    float dist2 = spacingPerContour2[i];
+  }
   return *outline1;
 }
 
-void DrawRend::drawLetter(FT_Outline *outline, float font_x, float font_y, float font_scale) {
+vector<vector<Vector2D>> DrawRend::drawLetter(FT_Outline *outline, float font_x, float font_y, float font_scale) {
   SVG& svg = *svgs[current_svg];
   //  svg.draw(software_rasterizer, ndc_to_screen * svg_to_ndc[current_svg]);
 
@@ -408,7 +469,10 @@ void DrawRend::drawLetter(FT_Outline *outline, float font_x, float font_y, float
   vector<Vector2D> startingPoints;
   vector<Vector2D> endingPoints;
 
+  vector<int> numPointsPerContour;
+
   for (int j = 0; j < outline->n_contours; j++) {
+    int numStartPointsDrawnSoFar = startingPoints.size();
     int start_contour_index;
     if (j == 0) {
       start_contour_index = 0;
@@ -525,6 +589,9 @@ void DrawRend::drawLetter(FT_Outline *outline, float font_x, float font_y, float
 
       // cout << "i: " << i + start_contour_index << " cur tag: " << FT_ON_BIT(tags[i]) << " conic or cubic: " << FT_ORDER_BIT(tags[i]) << endl;
     }
+
+    int numPointsForThisContour = startingPoints.size() - numStartPointsDrawnSoFar;
+    numPointsPerContour.push_back(numPointsForThisContour);
   }
 
   // fill in glyph
@@ -535,15 +602,33 @@ void DrawRend::drawLetter(FT_Outline *outline, float font_x, float font_y, float
       }
     }
   }
+
+  vector<vector<Vector2D>> startingPointsPerContour;
+
+  int contour_start_i = 0;
+  for (int i = 0; i < outline->n_contours; i++) {
+    int contour_end_i = numPointsPerContour[i];
+
+    // take points from contour_start_i to contour_end_i (these are the ones that are on the current contour)
+    vector<Vector2D> pointsOnCurrentContour;
+    for (int j = contour_start_i; j < contour_end_i; j++) {
+      pointsOnCurrentContour.push_back(startingPoints[i]);
+    }
+    startingPointsPerContour.push_back(pointsOnCurrentContour);
+
+    contour_start_i += numPointsPerContour[i];
+  }
+
+  return startingPointsPerContour;
 }
 
-void DrawRend::drawLetter(FT_Face font_face, char letter, float font_x, float font_y, float font_scale) {
+vector<vector<Vector2D>> DrawRend::drawLetter(FT_Face font_face, char letter, float font_x, float font_y, float font_scale) {
   // Draw the font
   FT_Set_Char_Size(font_face, 0, 16 * 16, 300, 300);
   auto error = FT_Load_Glyph(font_face, FT_Get_Char_Index(font_face, letter), FT_LOAD_DEFAULT);
   FT_Outline *outline = &font_face->glyph->outline;
 
-  drawLetter(outline, font_x, font_y, font_scale);
+  return drawLetter(outline, font_x, font_y, font_scale);
 }
 
     /**
@@ -559,19 +644,22 @@ void DrawRend::redraw() {
     drawLetter(font_faces[0], 'A', 0, 0, 0.5);
   } else if (font_faces.size() == 2){
     // draw two fonts and interpolate
-    char letter = 'A';
+    char letter = 'S';
     FT_Set_Char_Size(font_faces[0], 0, 16 * 16, 300, 300);
     FT_Load_Glyph(font_faces[0], FT_Get_Char_Index(font_faces[0], letter), FT_LOAD_DEFAULT);
     FT_Outline *outline1 = &font_faces[0]->glyph->outline;
+    cout << outline1->n_points << endl;
 
     FT_Set_Char_Size(font_faces[1], 0, 16 * 16, 300, 300);
     FT_Load_Glyph(font_faces[1], FT_Get_Char_Index(font_faces[1], letter), FT_LOAD_DEFAULT);
     FT_Outline *outline2 = &font_faces[1]->glyph->outline;
+    cout << outline2->n_points << endl;
 
-    drawLetter(font_faces[0], letter, 0, 0, 0.33);
+    vector<vector<Vector2D>> first_letter_points = drawLetter(font_faces[0], letter, 0, 0, 0.33);
+    vector<vector<Vector2D>> second_letter_points = drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
     FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5);
-    drawLetter(&interpolated_outline, 0.33, 0, 0.33);
-    drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
+    drawLetter(&interpolated_outline, 0.33, 0, 0.33, first_letter_points, second_letter_points);
+
   }
 
   // draw canvas outline
