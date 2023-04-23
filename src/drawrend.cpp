@@ -8,14 +8,24 @@
 #include "texture.h"
 #include <ctime>
 #include "rasterizer.h"
-//#include <geos/geom/GeometryFactory.h>
-//#include <geos/geom/Geometry.h>
+/* For geometry operations */
+#include <geos/geom/GeometryFactory.h>
+#include <geos/geom/Geometry.h>
+
+/* For WKT read/write */
+#include <geos/io/WKTReader.h>
+#include <geos/io/WKTWriter.h>
+#include <geos/geom/CoordinateArraySequence.h>
+#include <geos/linearref/LengthIndexedLine.h>
+
+using namespace geos::geom;
+using namespace geos::linearref;
+using namespace geos::io;
 
 #define FT_ON_BIT( flag )  ( flag & 0x01 )
 #define FT_ORDER_BIT( flag )  ( flag & 0x02 )
 
 using namespace std;
-//using namespace geos::geom;
 
 namespace CGL {
 
@@ -364,64 +374,71 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
   FT_Outline res;
   int m = 100;
   res.n_contours = outline1->n_contours;
-  res.n_points = m;
-
-  vector<float> lengthsPerContour1; // list of euclidean lengths per contour
-  vector<float> lengthsPerContour2; // list of euclidean lengths per contour
-  vector<float> spacingPerContour1; // list of spacing per contour
-  vector<float> spacingPerContour2; // list of spacing per contour
-
-  // compute total length of each contour
-  for (auto pointsInAContour : pointsInContour1) {
-    float length;
-    for (int i = 0; i < pointsInAContour.size() - 1; i++) {
-      Vector2D startPoint = pointsInAContour[i];
-      Vector2D endPoint = pointsInAContour[i + 1];
-      length += (endPoint - startPoint).norm();
-    }
-
-    lengthsPerContour1.push_back(length);
-    spacingPerContour1.push_back(length / m);
-  }
-  for (auto pointsInAContour : pointsInContour2) {
-    float length;
-    for (int i = 0; i < pointsInAContour.size() - 1; i++) {
-      Vector2D startPoint = pointsInAContour[i];
-      Vector2D endPoint = pointsInAContour[i + 1];
-      length += (endPoint - startPoint).norm();
-    }
-
-    lengthsPerContour2.push_back(length);
-    spacingPerContour2.push_back(length / m);
-  }
+  res.n_points = 0; // FIXME: update to # control points
 
   vector<vector<Vector2D>> sampledPointsPerContour1; // list of m points sampled per contour
   vector<vector<Vector2D>> sampledPointsPerContour2; // list of m points sampled per contour
 
+  GeometryFactory::Ptr factory = GeometryFactory::create();
+
   for (int i = 0; i < outline1->n_contours; i += 1) {
     // sample m points on the first font
-    float dist1 = spacingPerContour1[i];
     vector<Vector2D> contour1Points = pointsInContour1[i];
-    vector<Vector2D> mSampledPointsForCurContour;
-    int currStartInd = 0;
-    float amountAlongCurLine = 0;
-    for (int j = 0; j < m; j++) {
-      float distToNextSample = dist1;
+    vector<Vector2D> mSampledPointsForCurContour1;
 
-      // look at line segmeintnt that goes from currStartInd to currStartInd + 1
-      float lengthOfCurSegment = (contour1Points[currStartInd] - contour1Points[currStartInd + 1]).norm();
-
-      // while distToNextSample > 0: still within distance between sample points
-        // if distToNextSample + amountAlongCurLine < lengthOfCurSegment: still on the same line after this sample point
-          // add sample point to mSampledPointsForCurContour: x = , y = (lerp to find sample point)
-
-        // if distToNextSample + amountAlongCurLine > lengthOfCurSegment
+    CoordinateArraySequence *cl1 = new CoordinateArraySequence();
+    // add all the contour 1 points to cl
+    for (auto pt : contour1Points) {
+      cl1->add(Coordinate(pt.x, pt.y));
     }
-    sampledPointsPerContour1.push_back(mSampledPointsForCurContour);
+
+    LineString *ls1 = factory->createLineString(cl1);
+    // compute contour length and spacing
+    float spacing1 = ls1->getLength() / m;
+    LengthIndexedLine *lin1 = new LengthIndexedLine(ls1);
+
+    for (int j = 0; j < m; j++) {
+      // get point j along the contour
+      Coordinate newPoint = lin1->extractPoint(0, j*spacing1);
+      mSampledPointsForCurContour1.push_back(Vector2D(newPoint.x, newPoint.y));
+    }
 
     // sample m points on the second font
-    float dist2 = spacingPerContour2[i];
+    vector<Vector2D> contour2Points = pointsInContour2[i];
+    vector<Vector2D> mSampledPointsForCurContour2;
+    CoordinateArraySequence *cl2 = new CoordinateArraySequence();
+
+    // add all the contour 2 points to cl
+    for (auto pt : contour2Points) {
+      cl2->add(Coordinate(pt.x, pt.y));
+    }
+
+    LineString *ls2 = factory->createLineString(cl2);
+    // compute contour length and spacing
+    float spacing2 = ls2->getLength() / m;
+    LengthIndexedLine *lin2 = new LengthIndexedLine(ls2);
+
+    for (int j = 0; j < m; j++) {
+      // get point j along the contour 2
+      Coordinate newPoint = lin2->extractPoint(0, j*spacing2);
+      mSampledPointsForCurContour2.push_back(Vector2D(newPoint.x, newPoint.y));
+    }
+
+    // TODO: find index in mSampledPointsForCurContour1 and mSampledPointsForCurContour2 that would be the starting point
+    int contour1Offset = 0;
+    int contour2Offset = 0;
+
+    // lerp the 2 sets of m sampled points
+    vector<Vector2D> lerpedPoints;
+    for (int j = 0; j < m; j++) {
+      // TODO: offset j by indices % 100 (starting point)
+      Vector2D interpolatedPoint = lerp2D(mSampledPointsForCurContour1[j], mSampledPointsForCurContour2[j], t);
+      lerpedPoints.push_back(interpolatedPoint);
+    }
+
+    // TODO: fit bezier curves to 100 lerped points (find control points)
   }
+
   return *outline1;
 }
 
@@ -648,7 +665,7 @@ void DrawRend::redraw() {
     drawLetter(font_faces[0], 'A', 0, 0, 0.5);
   } else if (font_faces.size() == 2){
     // draw two fonts and interpolate
-    char letter = 'S';
+    char letter = 'A';
     FT_Set_Char_Size(font_faces[0], 0, 16 * 16, 300, 300);
     FT_Load_Glyph(font_faces[0], FT_Get_Char_Index(font_faces[0], letter), FT_LOAD_DEFAULT);
     FT_Outline *outline1 = &font_faces[0]->glyph->outline;

@@ -67,6 +67,10 @@ find_package(Freetype REQUIRED)
 target_include_directories(draw PRIVATE ${FREETYPE_INCLUDE_DIRS})
 target_link_libraries(draw PRIVATE ${FREETYPE_LIBRARIES})
 
+# GEOS
+find_package(GEOS REQUIRED)
+target_link_libraries(draw PRIVATE GEOS::geos)
+
 
 #-------------------------------------------------------------------------------
 # Add subdirectories

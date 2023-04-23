@@ -18,6 +18,17 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+/* For geometry operations */
+#include <geos/geom/GeometryFactory.h>
+#include <geos/geom/Geometry.h>
+
+/* For WKT read/write */
+#include <geos/io/WKTReader.h>
+#include <geos/io/WKTWriter.h>
+#include <geos/geom/CoordinateArraySequence.h>
+
+using namespace geos::geom;
+using namespace geos::io;
 
 using namespace std;
 using namespace CGL;
