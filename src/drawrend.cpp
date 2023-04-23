@@ -405,7 +405,7 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
     for (int j = 0; j < m; j++) {
       float distToNextSample = dist1;
 
-      // look at line segment that goes from currStartInd to currStartInd + 1
+      // look at line segmeintnt that goes from currStartInd to currStartInd + 1
       float lengthOfCurSegment = (contour1Points[currStartInd] - contour1Points[currStartInd + 1]).norm();
 
       // while distToNextSample > 0: still within distance between sample points
@@ -657,8 +657,8 @@ void DrawRend::redraw() {
 
     vector<vector<Vector2D>> first_letter_points = drawLetter(font_faces[0], letter, 0, 0, 0.33);
     vector<vector<Vector2D>> second_letter_points = drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
-    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5);
-    drawLetter(&interpolated_outline, 0.33, 0, 0.33, first_letter_points, second_letter_points);
+    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5, first_letter_points, second_letter_points);
+    drawLetter(&interpolated_outline, 0.33, 0, 0.33);
 
   }
 
