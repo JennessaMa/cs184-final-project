@@ -8,11 +8,14 @@
 #include "texture.h"
 #include <ctime>
 #include "rasterizer.h"
+//#include <geos/geom/GeometryFactory.h>
+//#include <geos/geom/Geometry.h>
 
 #define FT_ON_BIT( flag )  ( flag & 0x01 )
 #define FT_ORDER_BIT( flag )  ( flag & 0x02 )
 
 using namespace std;
+//using namespace geos::geom;
 
 namespace CGL {
 
@@ -606,8 +609,9 @@ vector<vector<Vector2D>> DrawRend::drawLetter(FT_Outline *outline, float font_x,
   vector<vector<Vector2D>> startingPointsPerContour;
 
   int contour_start_i = 0;
+  int contour_end_i = 0;
   for (int i = 0; i < outline->n_contours; i++) {
-    int contour_end_i = numPointsPerContour[i];
+    contour_end_i += numPointsPerContour[i];
 
     // take points from contour_start_i to contour_end_i (these are the ones that are on the current contour)
     vector<Vector2D> pointsOnCurrentContour;
@@ -657,8 +661,8 @@ void DrawRend::redraw() {
 
     vector<vector<Vector2D>> first_letter_points = drawLetter(font_faces[0], letter, 0, 0, 0.33);
     vector<vector<Vector2D>> second_letter_points = drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
-    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5, first_letter_points, second_letter_points);
-    drawLetter(&interpolated_outline, 0.33, 0, 0.33);
+//    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5, first_letter_points, second_letter_points);
+//    drawLetter(&interpolated_outline, 0.33, 0, 0.33);
 
   }
 
