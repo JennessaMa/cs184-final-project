@@ -396,11 +396,19 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
     // compute contour length and spacing
     float spacing1 = ls1->getLength() / m;
     LengthIndexedLine *lin1 = new LengthIndexedLine(ls1);
+    // track min dist to anchor point and index offset
+    float min_dist_anchor1 = 0.0;
+    int indexOffset1 = 0;
 
     for (int j = 0; j < m; j++) {
       // get point j along the contour
       Coordinate newPoint = lin1->extractPoint(0, j*spacing1);
       mSampledPointsForCurContour1.push_back(Vector2D(newPoint.x, newPoint.y));
+      float dist = distance(new Vector2D(0, 0), new Vector2D(newPoint.x, newPoint.y));
+      if (dist < min_dist_anchor1) {
+          min_dist_anchor1 = dist;
+          indexOffset1 = j;
+      }
     }
 
     // sample m points on the second font
@@ -417,22 +425,31 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
     // compute contour length and spacing
     float spacing2 = ls2->getLength() / m;
     LengthIndexedLine *lin2 = new LengthIndexedLine(ls2);
+    // track min dist to anchor point and index offset
+    float min_dist_anchor2 = 0.0;
+    int indexOffset2 = 0;
 
     for (int j = 0; j < m; j++) {
       // get point j along the contour 2
       Coordinate newPoint = lin2->extractPoint(0, j*spacing2);
       mSampledPointsForCurContour2.push_back(Vector2D(newPoint.x, newPoint.y));
+      float dist = distance(new Vector2D(0, 0), new Vector2D(newPoint.x, newPoint.y));
+      if (dist < min_dist_anchor2) {
+          min_dist_anchor2 = dist;
+          indexOffset1 = j;
+      }
     }
 
     // TODO: find index in mSampledPointsForCurContour1 and mSampledPointsForCurContour2 that would be the starting point
-    int contour1Offset = 0;
-    int contour2Offset = 0;
+    // added above
 
     // lerp the 2 sets of m sampled points
     vector<Vector2D> lerpedPoints;
     for (int j = 0; j < m; j++) {
       // TODO: offset j by indices % 100 (starting point)
-      Vector2D interpolatedPoint = lerp2D(mSampledPointsForCurContour1[j], mSampledPointsForCurContour2[j], t);
+      Vector2D offsetPoint1 = mSampledPointsForCurContour1[(j + indexOffset1) % m];
+      Vector2D offsetPoint2 = mSampledPointsForCurContour2[(j + indexOffset2) % m];
+      Vector2D interpolatedPoint = lerp2D(offsetPoint1, offsetPoint1, t);
       lerpedPoints.push_back(interpolatedPoint);
     }
 
