@@ -374,14 +374,19 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
   FT_Outline res;
   int m = 100;
   res.n_contours = outline1->n_contours;
-  res.n_points = 0; // FIXME: update to # control points
+  res.n_points = m * res.n_contours; // FIXME: update to # control points
 
   vector<vector<Vector2D>> sampledPointsPerContour1; // list of m points sampled per contour
   vector<vector<Vector2D>> sampledPointsPerContour2; // list of m points sampled per contour
 
   GeometryFactory::Ptr factory = GeometryFactory::create();
 
+  res.points = new FT_Vector[res.n_contours * m];
+  res.tags = new char[res.n_contours * m];
+  res.contours = new short[res.n_contours];
+
   for (int i = 0; i < outline1->n_contours; i += 1) {
+    cout << "processing outline: " << i << endl;
     // sample m points on the first font
     vector<Vector2D> contour1Points = pointsInContour1[i];
     vector<Vector2D> mSampledPointsForCurContour1;
@@ -390,6 +395,7 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
     // add all the contour 1 points to cl
     for (auto pt : contour1Points) {
       cl1->add(Coordinate(pt.x, pt.y));
+      cout << "line string point: " << pt.x << ", " << pt.y << endl;
     }
 
     LineString *ls1 = factory->createLineString(cl1);
@@ -402,7 +408,8 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
 
     for (int j = 0; j < m; j++) {
       // get point j along the contour
-      Coordinate newPoint = lin1->extractPoint(0, j*spacing1);
+      Coordinate newPoint = lin1->extractPoint(0, (float) j * spacing1);
+      cout << "extracted point for curve1 for font1: " << newPoint.x << ", " << newPoint.y << "   offset distance: " << j*spacing1 << " spacing1: " << spacing1 << " length 1: " << ls1->getLength() << endl;
       mSampledPointsForCurContour1.push_back(Vector2D(newPoint.x, newPoint.y));
       float dist = distance(new Vector2D(0, 0), new Vector2D(newPoint.x, newPoint.y));
       if (dist < min_dist_anchor1) {
@@ -431,12 +438,12 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
 
     for (int j = 0; j < m; j++) {
       // get point j along the contour 2
-      Coordinate newPoint = lin2->extractPoint(0, j*spacing2);
+      Coordinate newPoint = lin2->extractPoint(0, (float) j*spacing2);
       mSampledPointsForCurContour2.push_back(Vector2D(newPoint.x, newPoint.y));
       float dist = distance(new Vector2D(0, 0), new Vector2D(newPoint.x, newPoint.y));
       if (dist < min_dist_anchor2) {
           min_dist_anchor2 = dist;
-          indexOffset1 = j;
+          indexOffset2 = j;
       }
     }
 
@@ -449,14 +456,28 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
       // TODO: offset j by indices % 100 (starting point)
       Vector2D offsetPoint1 = mSampledPointsForCurContour1[(j + indexOffset1) % m];
       Vector2D offsetPoint2 = mSampledPointsForCurContour2[(j + indexOffset2) % m];
-      Vector2D interpolatedPoint = lerp2D(offsetPoint1, offsetPoint1, t);
+      Vector2D interpolatedPoint = lerp2D(offsetPoint1, offsetPoint2, t);
       lerpedPoints.push_back(interpolatedPoint);
     }
 
     // TODO: fit bezier curves to 100 lerped points (find control points)
+    for (int j = 0; j < lerpedPoints.size(); j += 1) {
+//      FT_Vector *vec = new FT_Vector();
+//      vec->x = lerpedPoints[j].x;
+//      vec->y = lerpedPoints[j].y;
+//      res.points[i * m + j] = *vec;
+      res.points[i * m + j].x = lerpedPoints[j].x;
+      res.points[i * m + j].y = lerpedPoints[j].y;
+    }
+
+    for (int j = 0; j < m; j++) {
+      res.tags[i * m + j] = '1';
+    }
+
+    res.contours[i] = m * (i + 1) - 1;
   }
 
-  return *outline1;
+  return res;
 }
 
 vector<vector<Vector2D>> DrawRend::drawLetter(FT_Outline *outline, float font_x, float font_y, float font_scale) {
@@ -650,7 +671,7 @@ vector<vector<Vector2D>> DrawRend::drawLetter(FT_Outline *outline, float font_x,
     // take points from contour_start_i to contour_end_i (these are the ones that are on the current contour)
     vector<Vector2D> pointsOnCurrentContour;
     for (int j = contour_start_i; j < contour_end_i; j++) {
-      pointsOnCurrentContour.push_back(startingPoints[i]);
+      pointsOnCurrentContour.push_back(startingPoints[j]);
     }
     startingPointsPerContour.push_back(pointsOnCurrentContour);
 
@@ -695,9 +716,12 @@ void DrawRend::redraw() {
 
     vector<vector<Vector2D>> first_letter_points = drawLetter(font_faces[0], letter, 0, 0, 0.33);
     vector<vector<Vector2D>> second_letter_points = drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
-//    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5, first_letter_points, second_letter_points);
-//    drawLetter(&interpolated_outline, 0.33, 0, 0.33);
-
+    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0, first_letter_points, second_letter_points);
+//    for (int i = 0; i < interpolated_outline.n_points; i++) {
+//      cout << "x = " << interpolated_outline.points[i].x << ", y = " << interpolated_outline.points[i].y << endl;
+//    }
+//    cout << "interpolated outline, n_contours = " << interpolated_outline.contours[0] << " " << interpolated_outline.contours[1] << endl;
+    drawLetter(&interpolated_outline, 0.33, 0, 0.33);
   }
 
   // draw canvas outline
