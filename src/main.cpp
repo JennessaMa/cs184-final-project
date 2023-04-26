@@ -26,9 +26,11 @@
 #include <geos/io/WKTReader.h>
 #include <geos/io/WKTWriter.h>
 #include <geos/geom/CoordinateArraySequence.h>
+#include <geos/linearref/LengthIndexedLine.h>
 
 using namespace geos::geom;
 using namespace geos::io;
+using namespace geos::linearref;
 
 using namespace std;
 using namespace CGL;
@@ -120,7 +122,7 @@ FT_Face load_font(const char* font_name ) {
   FT_Library ft;
   FT_Face face;
   if (FT_Init_FreeType (&ft) == 0) {
-    cout << "Successfully initialized freetype :)" << endl;
+//    cout << "Successfully initialized freetype :)" << endl;
     auto error = FT_New_Face( ft,
                               font_name,
                               0,
@@ -151,9 +153,26 @@ int main( int argc, char** argv ) {
     return 0;
   }
 
+//  GeometryFactory::Ptr factory = GeometryFactory::create();
+//  CoordinateArraySequence *cas = new CoordinateArraySequence();
+//  cas->add(Coordinate(0, 0));
+//  cas->add(Coordinate(1, 0));
+//  cas->add(Coordinate(1, 1));
+//
+//  LineString *ls = factory->createLineString(cas);
+//  LinearLocation *ll = new LinearLocation(0, 0.5);
+//
+//  cout << "0: " << getPointAtDistance(ls, 0) << endl;
+//  cout << "0.5: " << getPointAtDistance(ls, 0.5) << endl;
+//  cout << "1: " << getPointAtDistance(ls, 1) << endl;
+//  cout << "1.5: " << getPointAtDistance(ls, 1.5) << endl;
+//  cout << "2: " << getPointAtDistance(ls, 2) << endl;
+//
+//  return 0;
+
   std::vector<FT_Face> font_faces;
   font_faces.push_back(load_font("../times-new-roman.ttf"));
-  font_faces.push_back(load_font("../15716_FrugalSansLight.ttf"));
+  font_faces.push_back(load_font("../COMIC.TTF"));
 
     // create application
   DrawRend app(svgs, font_faces);

@@ -341,6 +341,24 @@ bool pointInPolygon(int polyCorners, vector<Vector2D> startingPoints, vector<Vec
   return inside;
 }
 
+Vector2D getPointAtDistance(LineString *ls, double distance) {
+  int currentSegmentIndex = 0;
+  while (distance >= 0) {
+    double curSegLength = LinearLocation(currentSegmentIndex, 0).getSegmentLength(ls);
+
+    if (curSegLength < distance) {
+      // we will move past the current line segment and will have more to go
+      distance -= curSegLength;
+      currentSegmentIndex += 1;
+    } else {
+      // we are somewhere within the current line segment
+      Coordinate result = LinearLocation(currentSegmentIndex, distance/curSegLength).getCoordinate(ls);
+      return Vector2D(result.x, result.y);
+    }
+  }
+  return Vector2D(-1, -1);
+}
+
 void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color, std::vector<Vector2D> *startingPoints, std::vector<Vector2D> *endingPoints)
 {
   float lastX;
@@ -386,7 +404,7 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
   res.contours = new short[res.n_contours];
 
   for (int i = 0; i < outline1->n_contours; i += 1) {
-    cout << "processing outline: " << i << endl;
+    // cout << "processing outline: " << i << endl;
     // sample m points on the first font
     vector<Vector2D> contour1Points = pointsInContour1[i];
     vector<Vector2D> mSampledPointsForCurContour1;
@@ -395,28 +413,33 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
     // add all the contour 1 points to cl
     for (auto pt : contour1Points) {
       cl1->add(Coordinate(pt.x, pt.y));
-      cout << "line string point: " << pt.x << ", " << pt.y << endl;
+      // cout << "line string point: " << pt.x << ", " << pt.y << endl;
     }
-
+    cout << "cl1 size: " << cl1->size() << endl;
     LineString *ls1 = factory->createLineString(cl1);
     // compute contour length and spacing
     float spacing1 = ls1->getLength() / m;
     LengthIndexedLine *lin1 = new LengthIndexedLine(ls1);
     // track min dist to anchor point and index offset
-    float min_dist_anchor1 = 0.0;
+    float min_dist_anchor1 = INFINITY;
     int indexOffset1 = 0;
 
     for (int j = 0; j < m; j++) {
       // get point j along the contour
-      Coordinate newPoint = lin1->extractPoint(0, (float) j * spacing1);
-      cout << "extracted point for curve1 for font1: " << newPoint.x << ", " << newPoint.y << "   offset distance: " << j*spacing1 << " spacing1: " << spacing1 << " length 1: " << ls1->getLength() << endl;
-      mSampledPointsForCurContour1.push_back(Vector2D(newPoint.x, newPoint.y));
-      float dist = distance(new Vector2D(0, 0), new Vector2D(newPoint.x, newPoint.y));
+      // Coordinate newPoint = lin1->extractPoint(0, (float) j * spacing1);
+      Vector2D newPoint = getPointAtDistance(ls1, (float) j * spacing1);
+      // cout << "extracted point for curve1 for font1: " << newPoint.x << ", " << newPoint.y << "   offset distance: " << j*spacing1 << " spacing1: " << spacing1 << " length 1: " << ls1->getLength() << endl;
+      mSampledPointsForCurContour1.push_back(newPoint);
+      float dist = pow(newPoint.x, 2) + pow(newPoint.y, 2);
+      dist = sqrt(dist);
       if (dist < min_dist_anchor1) {
           min_dist_anchor1 = dist;
           indexOffset1 = j;
       }
     }
+
+    // software_rasterizer->rasterize_point(mSampledPointsForCurContour1[indexOffset1].x, mSampledPointsForCurContour1[indexOffset1].y, Color(1, 0, 0));
+    software_rasterizer->rasterize_line(mSampledPointsForCurContour1[indexOffset1].x, mSampledPointsForCurContour1[indexOffset1].y, mSampledPointsForCurContour1[indexOffset1].x + 15, mSampledPointsForCurContour1[indexOffset1].y + 15, Color(1, 0, 0));
 
     // sample m points on the second font
     vector<Vector2D> contour2Points = pointsInContour2[i];
@@ -428,34 +451,49 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
       cl2->add(Coordinate(pt.x, pt.y));
     }
 
+    cout << "cl2 size: " << cl2->size() << endl;
     LineString *ls2 = factory->createLineString(cl2);
     // compute contour length and spacing
     float spacing2 = ls2->getLength() / m;
     LengthIndexedLine *lin2 = new LengthIndexedLine(ls2);
     // track min dist to anchor point and index offset
-    float min_dist_anchor2 = 0.0;
+    float min_dist_anchor2 = INFINITY;
     int indexOffset2 = 0;
 
     for (int j = 0; j < m; j++) {
       // get point j along the contour 2
-      Coordinate newPoint = lin2->extractPoint(0, (float) j*spacing2);
+      Vector2D newPoint = getPointAtDistance(ls2, (float) j * spacing2);
       mSampledPointsForCurContour2.push_back(Vector2D(newPoint.x, newPoint.y));
-      float dist = distance(new Vector2D(0, 0), new Vector2D(newPoint.x, newPoint.y));
+      float dist = pow(newPoint.x, 2) + pow(newPoint.y, 2);
+      dist = sqrt(dist);
       if (dist < min_dist_anchor2) {
           min_dist_anchor2 = dist;
           indexOffset2 = j;
       }
     }
 
-    // TODO: find index in mSampledPointsForCurContour1 and mSampledPointsForCurContour2 that would be the starting point
-    // added above
+    //software_rasterizer->rasterize_point(mSampledPointsForCurContour2[indexOffset2].x, mSampledPointsForCurContour2[indexOffset2].y, Color(1, 0, 0));
+    software_rasterizer->rasterize_line(mSampledPointsForCurContour2[indexOffset2].x, mSampledPointsForCurContour2[indexOffset2].y, mSampledPointsForCurContour2[indexOffset2].x + 15, mSampledPointsForCurContour2[indexOffset2].y + 15, Color(1, 0, 0));
+
+
+    cout << "index offset 1: " << indexOffset1 << endl;
+    cout << "min_dist_anchor1: " << min_dist_anchor1 << endl;
+    cout << "index offset 2: " << indexOffset2 << endl;
+    cout << "min_dist_anchor2: " << min_dist_anchor2 << endl;
 
     // lerp the 2 sets of m sampled points
     vector<Vector2D> lerpedPoints;
     for (int j = 0; j < m; j++) {
-      // TODO: offset j by indices % 100 (starting point)
       Vector2D offsetPoint1 = mSampledPointsForCurContour1[(j + indexOffset1) % m];
       Vector2D offsetPoint2 = mSampledPointsForCurContour2[(j + indexOffset2) % m];
+
+//      if (j < 10) {
+//        software_rasterizer->rasterize_line(offsetPoint1.x, offsetPoint1.y, offsetPoint1.x + 15, offsetPoint1.y + 15,
+//                                            Color(((double) j) / m, 0, 0));
+//        software_rasterizer->rasterize_line(offsetPoint2.x, offsetPoint2.y, offsetPoint2.x + 15, offsetPoint2.y + 15,
+//                                            Color( ((double) j) / m, 0, 0));
+//      }
+
       Vector2D interpolatedPoint = lerp2D(offsetPoint1, offsetPoint2, t);
       lerpedPoints.push_back(interpolatedPoint);
     }
@@ -467,7 +505,7 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
 //      vec->y = lerpedPoints[j].y;
 //      res.points[i * m + j] = *vec;
       res.points[i * m + j].x = lerpedPoints[j].x;
-      res.points[i * m + j].y = lerpedPoints[j].y;
+      res.points[i * m + j].y = -lerpedPoints[j].y;
     }
 
     for (int j = 0; j < m; j++) {
@@ -698,29 +736,25 @@ vector<vector<Vector2D>> DrawRend::drawLetter(FT_Face font_face, char letter, fl
 void DrawRend::redraw() {
   software_rasterizer->clear_buffers();
 
+  char letter = 'q';
   if (font_faces.size() == 1) {
     // draw just a single font
-    drawLetter(font_faces[0], 'A', 0, 0, 0.5);
+    drawLetter(font_faces[0], letter, 0, 0, 0.5);
   } else if (font_faces.size() == 2){
     // draw two fonts and interpolate
-    char letter = 'A';
     FT_Set_Char_Size(font_faces[0], 0, 16 * 16, 300, 300);
     FT_Load_Glyph(font_faces[0], FT_Get_Char_Index(font_faces[0], letter), FT_LOAD_DEFAULT);
     FT_Outline *outline1 = &font_faces[0]->glyph->outline;
-    cout << outline1->n_points << endl;
+    // cout << outline1->n_points << endl;
 
     FT_Set_Char_Size(font_faces[1], 0, 16 * 16, 300, 300);
     FT_Load_Glyph(font_faces[1], FT_Get_Char_Index(font_faces[1], letter), FT_LOAD_DEFAULT);
     FT_Outline *outline2 = &font_faces[1]->glyph->outline;
-    cout << outline2->n_points << endl;
+    // cout << outline2->n_points << endl;
 
     vector<vector<Vector2D>> first_letter_points = drawLetter(font_faces[0], letter, 0, 0, 0.33);
     vector<vector<Vector2D>> second_letter_points = drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
-    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0, first_letter_points, second_letter_points);
-//    for (int i = 0; i < interpolated_outline.n_points; i++) {
-//      cout << "x = " << interpolated_outline.points[i].x << ", y = " << interpolated_outline.points[i].y << endl;
-//    }
-//    cout << "interpolated outline, n_contours = " << interpolated_outline.contours[0] << " " << interpolated_outline.contours[1] << endl;
+    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5, first_letter_points, second_letter_points);
     drawLetter(&interpolated_outline, 0.33, 0, 0.33);
   }
 
