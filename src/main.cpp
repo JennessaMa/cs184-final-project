@@ -172,7 +172,7 @@ int main( int argc, char** argv ) {
 
   std::vector<FT_Face> font_faces;
   font_faces.push_back(load_font("../times-new-roman.ttf"));
-  font_faces.push_back(load_font("../COMIC.TTF"));
+  font_faces.push_back(load_font("../Monospace.TTF"));
 
     // create application
   DrawRend app(svgs, font_faces);

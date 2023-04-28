@@ -60,6 +60,7 @@ class DrawRend : public Renderer {
 
   float t = 0;
   char letter = 'A';
+  char letter2 ='o';
 
 private:
   // Global state variables for SVGs, pixels, and view transforms
