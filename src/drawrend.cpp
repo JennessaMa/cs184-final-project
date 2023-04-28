@@ -109,9 +109,10 @@ std::string DrawRend::info() {
   stringstream ss;
   stringstream sample_method;
   sample_method << level_strings[lsm] << ", " << pixel_strings[psm];
-  ss << "Resolution " << width << " x " << height << ". ";
-  ss << "Using " << sample_method.str() << " sampling. ";
-  ss << "Supersample rate " << sample_rate << " per pixel. ";
+  // ss << "Resolution " << width << " x " << height << ". ";
+  // ss << "Using " << sample_method.str() << " sampling. ";
+  // ss << "Supersample rate " << sample_rate << " per pixel. ";
+  ss << "t value: " << t;
   return ss.str();
 }
 
@@ -202,6 +203,7 @@ void DrawRend::keyboard_event(int key, int event, unsigned char mods) {
     // reset view transformation
   case ' ':
     view_init();
+    t = 0;
     redraw();
     break;
 
@@ -244,6 +246,11 @@ void DrawRend::keyboard_event(int key, int event, unsigned char mods) {
     show_zoom = (show_zoom + 1) % 2;
     break;
 
+  case 'T':
+    t += 0.025;
+    redraw();
+    break;
+
   default:
     return;
   }
@@ -270,11 +277,10 @@ void DrawRend::write_screenshot() {
   for (int row = 0; row < height; ++row)
     memcpy(&flippedPixels[row * width * 4], &windowPixels[(height - row - 1) * width * 4], 4 * width);
 
-  time_t t = time(nullptr);
-  tm* lt = localtime(&t);
+//  time_t t = time(nullptr);
+//  tm* lt = localtime(&t);
   stringstream ss;
-  ss << "screenshot_" << lt->tm_mon + 1 << "-" << lt->tm_mday << "_"
-    << lt->tm_hour << "-" << lt->tm_min << "-" << lt->tm_sec << ".png";
+  ss << "screenshot_" << letter << "_" << t << ".png";
   string file = ss.str();
   cout << "Writing file " << file << "...";
   if (lodepng::encode(file, flippedPixels, width, height))
@@ -364,7 +370,7 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color, std::
   float lastX;
   float lastY;
 
-  for (float t = 0.0; t <= 1.0f; t += 0.005f)
+  for (float t = 0.0; t <= 1.0f; t += 0.02f) // 0.005f initially
   {
     std::vector<Vector2D> curControlPoints = controlPoints;
     // run de casteljau until we reach 1 control point (n_points - 1 iterations)
@@ -378,7 +384,7 @@ void DrawRend::drawCurve(std::vector<Vector2D> controlPoints, Color color, std::
     // draw control point
     if (t != 0.0) {
       // draw line from (lastX, lastY) to (curX, curY)
-      software_rasterizer->rasterize_line(lastX, lastY, curX, curY, color);
+//      software_rasterizer->rasterize_line(lastX, lastY, curX, curY, color);
       startingPoints->push_back(Vector2D(lastX, lastY));
       endingPoints->push_back(Vector2D(curX, curY));
     }
@@ -415,7 +421,7 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
       cl1->add(Coordinate(pt.x, pt.y));
       // cout << "line string point: " << pt.x << ", " << pt.y << endl;
     }
-    cout << "cl1 size: " << cl1->size() << endl;
+//    cout << "cl1 size: " << cl1->size() << endl;
     LineString *ls1 = factory->createLineString(cl1);
     // compute contour length and spacing
     float spacing1 = ls1->getLength() / m;
@@ -439,7 +445,7 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
     }
 
     // software_rasterizer->rasterize_point(mSampledPointsForCurContour1[indexOffset1].x, mSampledPointsForCurContour1[indexOffset1].y, Color(1, 0, 0));
-    software_rasterizer->rasterize_line(mSampledPointsForCurContour1[indexOffset1].x, mSampledPointsForCurContour1[indexOffset1].y, mSampledPointsForCurContour1[indexOffset1].x + 15, mSampledPointsForCurContour1[indexOffset1].y + 15, Color(1, 0, 0));
+//    software_rasterizer->rasterize_line(mSampledPointsForCurContour1[indexOffset1].x, mSampledPointsForCurContour1[indexOffset1].y, mSampledPointsForCurContour1[indexOffset1].x + 15, mSampledPointsForCurContour1[indexOffset1].y + 15, Color(1, 0, 0));
 
     // sample m points on the second font
     vector<Vector2D> contour2Points = pointsInContour2[i];
@@ -451,7 +457,7 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
       cl2->add(Coordinate(pt.x, pt.y));
     }
 
-    cout << "cl2 size: " << cl2->size() << endl;
+//    cout << "cl2 size: " << cl2->size() << endl;
     LineString *ls2 = factory->createLineString(cl2);
     // compute contour length and spacing
     float spacing2 = ls2->getLength() / m;
@@ -473,13 +479,13 @@ FT_Outline DrawRend::interpolate_letter(FT_Outline *outline1, FT_Outline *outlin
     }
 
     //software_rasterizer->rasterize_point(mSampledPointsForCurContour2[indexOffset2].x, mSampledPointsForCurContour2[indexOffset2].y, Color(1, 0, 0));
-    software_rasterizer->rasterize_line(mSampledPointsForCurContour2[indexOffset2].x, mSampledPointsForCurContour2[indexOffset2].y, mSampledPointsForCurContour2[indexOffset2].x + 15, mSampledPointsForCurContour2[indexOffset2].y + 15, Color(1, 0, 0));
+//    software_rasterizer->rasterize_line(mSampledPointsForCurContour2[indexOffset2].x, mSampledPointsForCurContour2[indexOffset2].y, mSampledPointsForCurContour2[indexOffset2].x + 15, mSampledPointsForCurContour2[indexOffset2].y + 15, Color(1, 0, 0));
 
 
-    cout << "index offset 1: " << indexOffset1 << endl;
-    cout << "min_dist_anchor1: " << min_dist_anchor1 << endl;
-    cout << "index offset 2: " << indexOffset2 << endl;
-    cout << "min_dist_anchor2: " << min_dist_anchor2 << endl;
+//    cout << "index offset 1: " << indexOffset1 << endl;
+//    cout << "min_dist_anchor1: " << min_dist_anchor1 << endl;
+//    cout << "index offset 2: " << indexOffset2 << endl;
+//    cout << "min_dist_anchor2: " << min_dist_anchor2 << endl;
 
     // lerp the 2 sets of m sampled points
     vector<Vector2D> lerpedPoints;
@@ -606,7 +612,7 @@ vector<vector<Vector2D>> DrawRend::drawLetter(FT_Outline *outline, float font_x,
 
         if (FT_ON_BIT(tags[i]) == FT_CURVE_TAG_ON and
             FT_ON_BIT(tags[i + 1]) == FT_CURVE_TAG_ON) {
-          software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, contourColors[j]);
+//          software_rasterizer->rasterize_line(p1x, p1y, p2x, p2y, contourColors[j]);
           startingPoints.push_back(Vector2D(p1x, p1y));
           endingPoints.push_back(Vector2D(p2x, p2y));
         }
@@ -691,13 +697,15 @@ vector<vector<Vector2D>> DrawRend::drawLetter(FT_Outline *outline, float font_x,
   }
 
   // fill in glyph
-  for (int x = (int) top_left.x; x < (int) top_right.x; x++) {
-    for (int y = (int) top_left.y; y < (int) bottom_left.y; y++) {
+//  cout << "about to fill in the glyph" << endl;
+  for (int x = (int) top_left.x + font_x * canvas_width; x < (int) top_left.x + font_x * canvas_width + font_scale * canvas_width; x++) {
+    for (int y = (int) top_left.y + font_y * canvas_height; y < (int) top_left.y + font_y * canvas_height + font_scale * canvas_height; y++) {
       if (pointInPolygon(startingPoints.size(), startingPoints, endingPoints, (float) x, (float) y)) {
         software_rasterizer->rasterize_point((float) x, (float) y, Color::Black);
       }
     }
   }
+//  cout << "done filling in the glyph" << endl;
 
   vector<vector<Vector2D>> startingPointsPerContour;
 
@@ -736,7 +744,6 @@ vector<vector<Vector2D>> DrawRend::drawLetter(FT_Face font_face, char letter, fl
 void DrawRend::redraw() {
   software_rasterizer->clear_buffers();
 
-  char letter = 'q';
   if (font_faces.size() == 1) {
     // draw just a single font
     drawLetter(font_faces[0], letter, 0, 0, 0.5);
@@ -754,7 +761,7 @@ void DrawRend::redraw() {
 
     vector<vector<Vector2D>> first_letter_points = drawLetter(font_faces[0], letter, 0, 0, 0.33);
     vector<vector<Vector2D>> second_letter_points = drawLetter(font_faces[1], letter, 0.66, 0, 0.33);
-    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, 0.5, first_letter_points, second_letter_points);
+    FT_Outline interpolated_outline = interpolate_letter(outline1, outline2, t, first_letter_points, second_letter_points);
     drawLetter(&interpolated_outline, 0.33, 0, 0.33);
   }
 

@@ -184,7 +184,7 @@ void Viewer::drawInfo() {
     // update framecount OSD
     Color c = framecount < 20 ? Color(1.0, 0.35, 0.35) : Color(0.15, 0.5, 0.15);
     osd_text->set_color(line_id_framerate, c);
-    string framerate_info = "Framerate: " + to_string(framecount) + " fps";
+    string framerate_info = "";
     osd_text->set_text(line_id_framerate, framerate_info);
 
     // reset timer and counter

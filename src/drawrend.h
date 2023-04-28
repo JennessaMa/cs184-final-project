@@ -58,6 +58,9 @@ class DrawRend : public Renderer {
 
   Rasterizer * software_rasterizer;
 
+  float t = 0;
+  char letter = 'A';
+
 private:
   // Global state variables for SVGs, pixels, and view transforms
   std::vector<SVG*> svgs; size_t current_svg;
@@ -80,6 +83,7 @@ private:
   LevelSampleMethod lsm;
 
   bool gl;
+
 };
 
 Vector2D lerp2D(Vector2D p1, Vector2D p2, float t);

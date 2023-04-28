@@ -194,6 +194,12 @@ int main( int argc, char** argv ) {
   // init viewer
   viewer.init();
 
+  int num = 40;
+  for (int i = 0; i < num; i++) {
+    app.t += 1.0/40.0;
+    app.write_screenshot();
+  }
+
   // start viewer
   viewer.start();
 
